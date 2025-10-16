@@ -1072,13 +1072,13 @@ function generateICS() {
     let description = stripHtml(event.description) || '';
 
     if (event.speakers && event.speakers.length > 0) {
-      description += '\\n\\nSpeakers:\\n';
+      description += '\n\nSpeakers:\n';
       event.speakers.forEach((speaker) => {
         const speakerInfo = [speaker.name, speaker.jobTitle, speaker.company]
           .filter(Boolean)
           .join(' - ');
         const speakerType = speaker.type ? ` (${speaker.type})` : '';
-        description += `- ${speakerInfo}${speakerType}\\n`;
+        description += `- ${speakerInfo}${speakerType}\n`;
       });
     }
 
@@ -1089,7 +1089,7 @@ function generateICS() {
       eventMeta.push(...event.topics);
     }
     if (eventMeta.length > 0) {
-      description += `\\n\\nTopics: ${eventMeta.join(', ')}`;
+      description += `\n\nTopics: ${eventMeta.join(', ')}`;
     }
 
     const uid = `${event.eventId}@money2020-event-swiper`;
