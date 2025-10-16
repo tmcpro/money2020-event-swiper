@@ -4,7 +4,9 @@ Tinder-style app to quickly select the events you want to go to for Money 2020.
 
 After the 200+ events you get the calendar invites to just the ones you want to go to with all the details. 
 
-RUNS LOCALLY - NO DATA SENT TO SERVERS
+RUNS LOCALLY ON BROWSER - NO DATA SENT TO SERVERS
+
+See a deployed version here: [https://m2020.pages.dev](https://m2020.pages.dev)
 
 ## Features
 
