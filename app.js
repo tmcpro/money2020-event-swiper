@@ -2,6 +2,8 @@ let events = [];
 let currentIndex = 0;
 
 const STORAGE_KEY = 'event-swiper-selected';
+const PROCESSED_IDS_KEY = 'event-swiper-processed-ids';
+const CURRENT_INDEX_KEY = 'event-swiper-current-index';
 const DATA_TIMESTAMP_KEY = 'event-swiper-data-timestamp';
 const EVENTS_CACHE_KEY = 'event-swiper-events-cache';
 const EVENTS_API = 'https://0jaku7mk0a.execute-api.eu-west-1.amazonaws.com/api/events/mu2025';
@@ -9,6 +11,7 @@ const SPEAKERS_API = 'https://0jaku7mk0a.execute-api.eu-west-1.amazonaws.com/api
 const DATA_EXPIRY_DAYS = 4;
 
 let selectedEvents = loadStoredSelections();
+let processedIds = loadProcessedIds();
 
 let isDragging = false;
 let startX = 0;
@@ -24,6 +27,55 @@ let isLoading = false; // Prevent interactions during data loading
 
 // Store event listener references for cleanup
 let currentCardListeners = null;
+
+// --- Normalization & Persistence Helpers ---
+function normalizeDateIso(value) {
+  if (value === null || value === undefined) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+
+  const datePart = raw.includes('T') ? raw.split('T')[0] : raw;
+
+  if (/^\d{8}$/.test(datePart)) {
+    return `${datePart.slice(0, 4)}-${datePart.slice(4, 6)}-${datePart.slice(6, 8)}`;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return datePart;
+  }
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(datePart)) {
+    const [month, day, year] = datePart.split('/');
+    return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  console.warn(`Unrecognized dateIso format: "${value}"`);
+  return '';
+}
+
+function normalizeTime(value) {
+  if (value === null || value === undefined) return '';
+  const digits = String(value).replace(/\D/g, '');
+  if (digits.length === 4) return digits;       // HHmm
+  if (digits.length === 3) return `0${digits}`; // Hmm -> HHmm
+  if (digits.length === 6) return digits.slice(0, 4); // HHmmss -> HHmm
+  if (!digits) return '';
+  console.warn(`Unrecognized time format: "${value}"`);
+  return '';
+}
+
+function addDaysIso(dateStr, days) {
+  const [y, m, d] = (dateStr || '').split('-').map((s) => parseInt(s, 10));
+  if (!y || !m || !d) return dateStr;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  const yyyy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/* duplicate normalizeDateIso/normalizeTime removed */
 
 function loadStoredSelections() {
   try {
@@ -41,6 +93,42 @@ function saveSelections() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedEvents));
   } catch (error) {
     console.warn('Unable to persist selections.', error);
+  }
+}
+
+function loadProcessedIds() {
+  try {
+    const raw = localStorage.getItem(PROCESSED_IDS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(arr.map(String));
+  } catch (error) {
+    console.warn('Failed to load processed IDs.', error);
+    return new Set();
+  }
+}
+
+function saveProcessedIds() {
+  try {
+    localStorage.setItem(PROCESSED_IDS_KEY, JSON.stringify(Array.from(processedIds)));
+  } catch (error) {
+    console.warn('Unable to save processed IDs.', error);
+  }
+}
+
+function loadSavedIndex() {
+  try {
+    const raw = localStorage.getItem(CURRENT_INDEX_KEY);
+    return raw ? Math.max(parseInt(raw, 10) || 0, 0) : 0;
+  } catch (error) {
+    return 0;
+  }
+}
+
+function saveCurrentIndex() {
+  try {
+    localStorage.setItem(CURRENT_INDEX_KEY, String(currentIndex));
+  } catch (error) {
+    // Non-fatal
   }
 }
 
@@ -110,6 +198,7 @@ function updateButtonStates() {
 
 function updateUndoButton() {
   const undoBtn = document.getElementById('undo-btn');
+  if (!undoBtn) return;
   if (lastAction && !actionInProgress) {
     undoBtn.classList.add('visible');
   } else {
@@ -126,6 +215,13 @@ function performUndo() {
     // Remove from selected events
     selectedEvents = selectedEvents.filter(e => e.eventId !== eventData.eventId);
     saveSelections();
+    // Allow the event to be processed again
+    processedIds.delete(String(eventData.eventId));
+    saveProcessedIds();
+  } else if (type === 'skip') {
+    // Allow the event to be processed again
+    processedIds.delete(String(eventData.eventId));
+    saveProcessedIds();
   }
 
   // Go back to the previous card
@@ -149,7 +245,8 @@ async function loadEvents(mode = 'initial') {
     const cachedEvents = loadCachedEvents();
 
     if (cachedEvents && Array.isArray(cachedEvents)) {
-      events = cachedEvents;
+      // Always filter by processedIds on resume so handled events don't reappear
+      events = cachedEvents.filter((ev) => !processedIds.has(String(ev.eventId)));
       currentIndex = 0;
       updateCounter();
       showCurrentCard();
@@ -197,7 +294,11 @@ async function loadEvents(mode = 'initial') {
       };
     });
 
-    events = eventsData.entities.map((event) => {
+    const mapped = eventsData.entities.map((event) => {
+      const normalizedDateIso = normalizeDateIso(event.dateIso);
+      const normalizedStart = normalizeTime(event.startTime);
+      const normalizedEnd = normalizeTime(event.endTime);
+
       const speakers = (event.speakerData || []).map((sd) => {
         const info = speakerMap[sd.appSpeakerId] || {};
         return {
@@ -211,9 +312,10 @@ async function loadEvents(mode = 'initial') {
         title: event.title || 'Untitled Event',
         description: event.description || '',
         date: event.dateLong || 'Date TBA',
-        dateIso: event.dateIso || '',
-        startTime: event.startTime || '',
-        endTime: event.endTime || '',
+        dateIso: normalizedDateIso,
+        rawDateIso: event.dateIso || '',
+        startTime: normalizedStart,
+        endTime: normalizedEnd,
         venue: event.eventVenue || 'Venue TBA',
         eventType: event.eventTypeName || '',
         track: event.track || '',
@@ -223,7 +325,7 @@ async function loadEvents(mode = 'initial') {
     });
 
     // Sort events by date (ISO format) and then by start time
-    events.sort((a, b) => {
+    mapped.sort((a, b) => {
       // First sort by date
       if (a.dateIso && b.dateIso && a.dateIso !== b.dateIso) {
         return a.dateIso.localeCompare(b.dateIso);
@@ -235,14 +337,25 @@ async function loadEvents(mode = 'initial') {
       return 0;
     });
 
-    const validIds = new Set(events.map((event) => event.eventId));
-    const filteredSelections = selectedEvents.filter((event) => validIds.has(event.eventId));
-    if (filteredSelections.length !== selectedEvents.length) {
-      selectedEvents = filteredSelections;
+    // Filter out already processed events so they don't reappear after refresh
+    const remaining = mapped.filter((ev) => !processedIds.has(String(ev.eventId)));
+    events = remaining;
+
+    const eventMap = new Map(mapped.map((event) => [event.eventId, event]));
+    const refreshedSelections = selectedEvents
+      .map((selected) => eventMap.get(selected.eventId))
+      .filter(Boolean);
+
+    const selectionsChanged = refreshedSelections.length !== selectedEvents.length ||
+      refreshedSelections.some((event, index) => event !== selectedEvents[index]);
+
+    if (selectionsChanged) {
+      selectedEvents = refreshedSelections;
       saveSelections();
     }
 
     currentIndex = 0;
+    saveCurrentIndex();
 
     // Cache the processed events
     saveCachedEvents(events);
@@ -559,6 +672,8 @@ function handleLike() {
   if (!wasAlreadySelected) {
     selectedEvents.push(event);
     saveSelections();
+    processedIds.add(String(event.eventId));
+    saveProcessedIds();
     lastAction = { type: 'like', eventData: event, index: currentIndex };
   } else {
     lastAction = { type: 'skip', eventData: event, index: currentIndex };
@@ -575,6 +690,8 @@ function handleDislike() {
   if (!event) return;
 
   actionInProgress = true;
+  processedIds.add(String(event.eventId));
+  saveProcessedIds();
   lastAction = { type: 'skip', eventData: event, index: currentIndex };
   updateUndoButton();
   animateCardExit('left');
@@ -597,6 +714,7 @@ function animateCardExit(direction) {
     currentIndex += 1;
     updateCounter();
     showCurrentCard();
+    saveCurrentIndex();
     actionInProgress = false;
   }, 300);
 }
@@ -625,17 +743,23 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-document.getElementById('btn-dislike').addEventListener('click', () => {
-  if (currentIndex < events.length) {
-    handleDislike();
-  }
-});
+const btnDislike = document.getElementById('btn-dislike');
+if (btnDislike) {
+  btnDislike.addEventListener('click', () => {
+    if (currentIndex < events.length) {
+      handleDislike();
+    }
+  });
+}
 
-document.getElementById('btn-like').addEventListener('click', () => {
-  if (currentIndex < events.length) {
-    handleLike();
-  }
-});
+const btnLike = document.getElementById('btn-like');
+if (btnLike) {
+  btnLike.addEventListener('click', () => {
+    if (currentIndex < events.length) {
+      handleLike();
+    }
+  });
+}
 
 function showSelectedEventsOverlay() {
   const overlay = document.getElementById('selected-overlay');
@@ -701,20 +825,40 @@ function hideSelectedEventsOverlay() {
   }, 500); // Match the transition duration
 }
 
-document.getElementById('view-selected').addEventListener('click', () => {
-  showSelectedEventsOverlay();
-});
+const viewSelectedBtn = document.getElementById('view-selected');
+if (viewSelectedBtn) {
+  viewSelectedBtn.addEventListener('click', () => {
+    // If the overlay markup exists, use it. Otherwise, fall back to alert summary.
+    const overlay = document.getElementById('selected-overlay');
+    const overlayBody = document.getElementById('overlay-body');
+    if (overlay && overlayBody) {
+      showSelectedEventsOverlay();
+    } else {
+      if (selectedEvents.length === 0) {
+        alert('No events selected yet');
+      } else {
+        const summary = selectedEvents.map((e, i) => `${i + 1}. ${e.title}\n   ${formatDateTime(e.date, e.startTime, e.endTime)}\n   ${e.venue}`).join('\n\n');
+        alert(`Selected Events (${selectedEvents.length}):\n\n${summary}`);
+      }
+    }
+  });
+}
 
-document.getElementById('close-overlay').addEventListener('click', () => {
-  hideSelectedEventsOverlay();
-});
-
-// Close overlay when clicking on background
-document.getElementById('selected-overlay').addEventListener('click', (event) => {
-  if (event.target.id === 'selected-overlay') {
+const closeOverlayBtn = document.getElementById('close-overlay');
+if (closeOverlayBtn) {
+  closeOverlayBtn.addEventListener('click', () => {
     hideSelectedEventsOverlay();
-  }
-});
+  });
+}
+
+const selectedOverlayEl = document.getElementById('selected-overlay');
+if (selectedOverlayEl) {
+  selectedOverlayEl.addEventListener('click', (event) => {
+    if (event.target.id === 'selected-overlay') {
+      hideSelectedEventsOverlay();
+    }
+  });
+}
 
 // About overlay functions
 function showAboutOverlay() {
@@ -742,36 +886,51 @@ function hideAboutOverlay() {
   }, 500); // Match the transition duration
 }
 
-document.getElementById('about').addEventListener('click', () => {
-  showAboutOverlay();
-});
-
-document.getElementById('close-about').addEventListener('click', () => {
-  hideAboutOverlay();
-});
-
-// Close about overlay when clicking on background
-document.getElementById('about-overlay').addEventListener('click', (event) => {
-  if (event.target.id === 'about-overlay') {
+const aboutBtn = document.getElementById('about');
+if (aboutBtn) {
+  aboutBtn.addEventListener('click', () => {
+    showAboutOverlay();
+  });
+}
+const closeAboutBtn = document.getElementById('close-about');
+if (closeAboutBtn) {
+  closeAboutBtn.addEventListener('click', () => {
     hideAboutOverlay();
-  }
-});
+  });
+}
+const aboutOverlayEl = document.getElementById('about-overlay');
+if (aboutOverlayEl) {
+  aboutOverlayEl.addEventListener('click', (event) => {
+    if (event.target.id === 'about-overlay') {
+      hideAboutOverlay();
+    }
+  });
+}
 
-document.getElementById('undo-btn').addEventListener('click', () => {
-  performUndo();
-});
+const undoBtnEl = document.getElementById('undo-btn');
+if (undoBtnEl) {
+  undoBtnEl.addEventListener('click', () => {
+    performUndo();
+  });
+}
 
-document.getElementById('reset').addEventListener('click', () => {
-  if (!confirm('Reset all selections and start over?')) return;
+const resetBtn = document.getElementById('reset');
+if (resetBtn) {
+  resetBtn.addEventListener('click', () => {
+    if (!confirm('Reset all selections and start over?')) return;
 
-  selectedEvents = [];
-  saveSelections();
-  currentIndex = 0;
-  lastAction = null;
-  updateCounter();
-  showCurrentCard();
-  updateUndoButton();
-});
+    selectedEvents = [];
+    saveSelections();
+    processedIds = new Set();
+    saveProcessedIds();
+    currentIndex = 0;
+    saveCurrentIndex();
+    lastAction = null;
+    updateCounter();
+    showCurrentCard();
+    updateUndoButton();
+  });
+}
 
 // Export overlay functions
 function showExportOverlay() {
@@ -811,37 +970,22 @@ function generateICS() {
   }
 
   // ICS file format helper functions
-  const formatICSDate = (dateIso, time) => {
-    // dateIso format: "2025-10-26", time format: "0900"
-    if (!dateIso || !time) return '';
+  const formatICSDate = (dateIso, time, label = 'event') => {
+    const normalizedDate = normalizeDateIso(dateIso);
+    const normalizedTime = normalizeTime(time);
 
-    // Validate dateIso format (must be YYYY-MM-DD with length 10)
-    if (dateIso.length < 10 || dateIso.charAt(4) !== '-' || dateIso.charAt(7) !== '-') {
-      console.warn(`Invalid dateIso format: "${dateIso}". Expected YYYY-MM-DD format.`);
+    if (!normalizedDate) {
+      console.warn(`Skipping ${label}: unable to parse date value "${dateIso}".`);
       return '';
     }
 
-    // Validate time format (must be 4 digits)
-    if (time.length !== 4) {
-      console.warn(`Invalid time format: "${time}". Expected 4-digit format like "0900".`);
+    if (!normalizedTime) {
+      console.warn(`Skipping ${label}: unable to parse time value "${time}".`);
       return '';
     }
 
-    const year = dateIso.substring(0, 4);
-    const month = dateIso.substring(5, 7);
-    const day = dateIso.substring(8, 10);
-    const hour = time.substring(0, 2);
-    const minute = time.substring(2, 4);
-
-    // Validate extracted values are numbers
-    if (!/^\d{4}$/.test(year) || !/^\d{2}$/.test(month) || !/^\d{2}$/.test(day) ||
-        !/^\d{2}$/.test(hour) || !/^\d{2}$/.test(minute)) {
-      console.warn(`Invalid date/time components. Year: ${year}, Month: ${month}, Day: ${day}, Hour: ${hour}, Minute: ${minute}`);
-      return '';
-    }
-
-    // Format: YYYYMMDDTHHMMSS in Pacific Time
-    return `${year}${month}${day}T${hour}${minute}00`;
+    const compactDate = normalizedDate.replace(/-/g, '');
+    return `${compactDate}T${normalizedTime}00`;
   };
 
   const escapeICS = (text) => {
@@ -867,7 +1011,7 @@ function generateICS() {
     return lines.join('\r\n');
   };
 
-  // Generate ICS content
+  // Generate ICS content (includes VTIMEZONE for America/Los_Angeles)
   let icsContent = 'BEGIN:VCALENDAR\r\n';
   icsContent += 'VERSION:2.0\r\n';
   icsContent += 'PRODID:-//M2020 Events//Money2020 Events//EN\r\n';
@@ -875,16 +1019,54 @@ function generateICS() {
   icsContent += 'METHOD:PUBLISH\r\n';
   icsContent += 'X-WR-TIMEZONE:America/Los_Angeles\r\n';
   icsContent += 'X-WR-CALNAME:Money20/20 Selected Events\r\n';
+  icsContent += 'BEGIN:VTIMEZONE\r\n';
+  icsContent += 'TZID:America/Los_Angeles\r\n';
+  icsContent += 'X-LIC-LOCATION:America/Los_Angeles\r\n';
+  icsContent += 'BEGIN:DAYLIGHT\r\n';
+  icsContent += 'TZOFFSETFROM:-0800\r\n';
+  icsContent += 'TZOFFSETTO:-0700\r\n';
+  icsContent += 'TZNAME:PDT\r\n';
+  icsContent += 'DTSTART:19700308T020000\r\n';
+  icsContent += 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU\r\n';
+  icsContent += 'END:DAYLIGHT\r\n';
+  icsContent += 'BEGIN:STANDARD\r\n';
+  icsContent += 'TZOFFSETFROM:-0700\r\n';
+  icsContent += 'TZOFFSETTO:-0800\r\n';
+  icsContent += 'TZNAME:PST\r\n';
+  icsContent += 'DTSTART:19701101T020000\r\n';
+  icsContent += 'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU\r\n';
+  icsContent += 'END:STANDARD\r\n';
+  icsContent += 'END:VTIMEZONE\r\n';
+
+  let skippedEvents = 0;
+  let exportedEvents = 0;
 
   selectedEvents.forEach((event) => {
-    const startDateTime = formatICSDate(event.dateIso, event.startTime);
-    const endDateTime = formatICSDate(event.dateIso, event.endTime);
+    const normalizedDate = event.dateIso || normalizeDateIso(event.rawDateIso);
+    const startNorm = normalizeTime(event.startTime);
+    const endNorm = normalizeTime(event.endTime);
+    let endDateIso = normalizedDate;
 
-    // Skip events with invalid date/time data
+    // Handle events crossing midnight: if end < start, roll end date to next day
+    if (startNorm && endNorm && parseInt(endNorm, 10) < parseInt(startNorm, 10)) {
+      endDateIso = addDaysIso(normalizedDate, 1);
+    }
+
+    const startDateTime = formatICSDate(normalizedDate, startNorm, `${event.title} (start)`);
+    let endDateTime = formatICSDate(endDateIso, endNorm, `${event.title} (end)`);
+
+    // If end time cannot be parsed, fall back to start time so event still appears
+    if (!endDateTime && startDateTime) {
+      endDateTime = startDateTime;
+    }
+
     if (!startDateTime || !endDateTime) {
-      console.warn(`Skipping event "${event.title}" due to invalid date/time. dateIso: "${event.dateIso}", startTime: "${event.startTime}", endTime: "${event.endTime}"`);
+      console.warn(`Skipping event "${event.title}" due to invalid date/time. dateIso: "${normalizedDate}", startTime: "${event.startTime}", endTime: "${event.endTime}"`);
+      skippedEvents++;
       return;
     }
+
+    exportedEvents++;
 
     // Build description with speakers and details
     let description = stripHtml(event.description) || '';
@@ -927,6 +1109,17 @@ function generateICS() {
 
   icsContent += 'END:VCALENDAR\r\n';
 
+  // Show alert if no events were exported
+  if (exportedEvents === 0) {
+    alert(`❌ Unable to export events.\n\nAll ${selectedEvents.length} selected events have invalid date/time data.\n\nPlease check the browser console for details.`);
+    return;
+  }
+
+  // Show warning if some events were skipped
+  if (skippedEvents > 0) {
+    console.warn(`⚠️ Exported ${exportedEvents} events, skipped ${skippedEvents} events with invalid dates.`);
+  }
+
   // Download ICS file
   const filename = `money2020-events-${Date.now()}.ics`;
   const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
@@ -939,33 +1132,64 @@ function generateICS() {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 
+  // Show success message
+  if (skippedEvents > 0) {
+    alert(`✅ Exported ${exportedEvents} of ${selectedEvents.length} events.\n\n${skippedEvents} events were skipped due to invalid dates.\n\nCheck the browser console for details.`);
+  } else {
+    alert(`✅ Exported ${exportedEvents} events to your calendar file.`);
+  }
+
   // Close the overlay after download
   setTimeout(() => {
     hideExportOverlay();
   }, 500);
 }
 
-document.getElementById('export').addEventListener('click', () => {
+function handleExportClick() {
   if (selectedEvents.length === 0) {
     alert('No events to export!');
     return;
   }
-  showExportOverlay();
-});
-
-document.getElementById('close-export').addEventListener('click', () => {
-  hideExportOverlay();
-});
-
-// Close export overlay when clicking on background
-document.getElementById('export-overlay').addEventListener('click', (event) => {
-  if (event.target.id === 'export-overlay') {
-    hideExportOverlay();
+  const overlay = document.getElementById('export-overlay');
+  const countEl = document.getElementById('export-count');
+  if (overlay && countEl) {
+    showExportOverlay();
+  } else {
+    generateICS();
   }
-});
+}
 
-document.getElementById('download-ics').addEventListener('click', () => {
-  generateICS();
-});
+const exportBtn = document.getElementById('export');
+if (exportBtn) {
+  exportBtn.addEventListener('click', handleExportClick);
+}
+
+const exportEndBtn = document.getElementById('export-end');
+if (exportEndBtn) {
+  exportEndBtn.addEventListener('click', handleExportClick);
+}
+
+const closeExportBtn = document.getElementById('close-export');
+if (closeExportBtn) {
+  closeExportBtn.addEventListener('click', () => {
+    hideExportOverlay();
+  });
+}
+
+const exportOverlayEl = document.getElementById('export-overlay');
+if (exportOverlayEl) {
+  exportOverlayEl.addEventListener('click', (event) => {
+    if (event.target.id === 'export-overlay') {
+      hideExportOverlay();
+    }
+  });
+}
+
+const downloadIcsBtn = document.getElementById('download-ics');
+if (downloadIcsBtn) {
+  downloadIcsBtn.addEventListener('click', () => {
+    generateICS();
+  });
+}
 
 loadEvents();
