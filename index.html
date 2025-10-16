@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M2020 Events</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      overflow-x: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #000000;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .header {
+      color: white;
+      text-align: center;
+      margin-bottom: 12px;
+      position: relative;
+      min-height: 44px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.5s ease;
+    }
+
+    .header h1 {
+      font-size: clamp(1.3em, 4vw, 1.5em);
+      margin-bottom: 6px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    .header.loaded h1 {
+      opacity: 0;
+      transform: translateY(-10px);
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .counter {
+      background: #00E5CC;
+      padding: 6px 14px;
+      border-radius: 12px;
+      font-size: clamp(0.75em, 2vw, 0.85em);
+      font-weight: 700;
+      display: inline-block;
+      border: none;
+      color: #000000;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.5s ease 0.3s, transform 0.5s ease 0.3s;
+    }
+
+    .header.loaded .counter {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .counter-number {
+      font-weight: 700;
+    }
+
+    .card-container {
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      height: 650px;
+      perspective: 1000px;
+    }
+
+    .card {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      cursor: grab;
+      user-select: none;
+      transition: transform 0.3s ease;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card:active {
+      cursor: grabbing;
+    }
+
+    .card.swiping-left {
+      transform: translateX(-100px) rotate(-10deg);
+    }
+
+    .card.swiping-right {
+      transform: translateX(100px) rotate(10deg);
+    }
+
+    .card-content {
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 30px 30px 10px;
+      background: linear-gradient(to bottom, #ffffff 0%, #f8f9ff 100%);
+      border-bottom: 1px solid #e8eaf6;
+    }
+
+    .event-title {
+      font-size: clamp(1.35em, 3.5vw, 1.6em);
+      font-weight: 800;
+      color: #000000;
+      margin-bottom: clamp(12px, 2.5vw, 16px);
+      line-height: 1.25;
+      letter-spacing: -0.03em;
+    }
+
+    .event-title::before {
+      content: "/";
+      color: #FF006B;
+      margin-right: 6px;
+      font-weight: 300;
+    }
+
+    .event-meta {
+      display: flex;
+      flex-direction: column;
+      gap: clamp(8px, 1.5vw, 10px);
+      color: #4a4a68;
+      font-size: clamp(0.88em, 2vw, 0.95em);
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+
+    .meta-item.primary {
+      font-size: 1.05em;
+      color: #2d2d44;
+      font-weight: 600;
+    }
+
+    .meta-item.datetime {
+      font-size: clamp(1em, 2.2vw, 1.1em);
+      color: #1a1a2e;
+      font-weight: 600;
+    }
+
+    .meta-icon {
+      font-size: 1.3em;
+      width: clamp(18px, 4vw, 24px);
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #FF006B;
+      color: white;
+      border-radius: 14px;
+      font-size: clamp(0.75em, 1.8vw, 0.82em);
+      font-weight: 700;
+      margin-right: 4px;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      line-height: 1.3;
+    }
+
+    .badge.secondary {
+      background: #00E5CC;
+      color: #000000;
+      font-weight: 700;
+    }
+
+    .event-description {
+      padding: 10px clamp(20px, 4vw, 30px);
+      color: #4a4a68;
+      line-height: 1.6;
+      font-size: clamp(0.88em, 2vw, 0.92em);
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex: 1;
+      position: relative;
+      min-height: 100px;
+      max-height: 250px;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .event-description::-webkit-scrollbar {
+      display: none;
+    }
+
+    .speakers-section {
+      padding: 10px clamp(20px, 4vw, 30px) clamp(16px, 3vw, 20px);
+      background: #fafbff;
+      border-top: 1px solid #e8eaf6;
+      flex-shrink: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      max-height: 200px;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .speakers-section::-webkit-scrollbar {
+      display: none;
+    }
+
+    .speakers-title {
+      font-size: clamp(0.72em, 1.6vw, 0.8em);
+      font-weight: 700;
+      color: #6a6a82;
+      margin-bottom: clamp(10px, 2vw, 12px);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .speaker {
+      margin-bottom: clamp(8px, 1.8vw, 10px);
+      padding: 0;
+      background: transparent;
+      border-radius: 0;
+    }
+
+    .speaker:last-child {
+      margin-bottom: 0;
+    }
+
+    .speaker-name {
+      font-weight: 500;
+      color: #6a6a82;
+      font-size: clamp(0.75em, 1.7vw, 0.8em);
+      line-height: 1.3;
+    }
+
+    .speaker-role {
+      color: #1a1a2e;
+      font-size: clamp(0.8em, 1.8vw, 0.85em);
+      font-weight: 600;
+      margin-top: 1px;
+      line-height: 1.35;
+    }
+
+    .speaker-type {
+      color: #8a8a9a;
+      font-weight: 500;
+      font-size: 0.95em;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-top: 30px;
+    }
+
+    .btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-size: 2em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn:hover {
+      transform: scale(1.1);
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    .btn-dislike {
+      background: #333333;
+      color: white;
+    }
+
+    .btn-like {
+      background: #FF006B;
+      color: white;
+    }
+
+    .controls {
+      margin-top: 30px;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .control-btn {
+      padding: 12px 24px;
+      background: #00E5CC;
+      color: #000000;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+    }
+
+    .control-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 229, 204, 0.4);
+      background: #00FCD9;
+    }
+
+    .no-more-events {
+      display: none;
+      text-align: center;
+      color: white;
+      font-size: 1.5em;
+      padding: 40px;
+    }
+
+    .loading-spinner {
+      display: none;
+      width: 60px;
+      height: 60px;
+      border: 6px solid rgba(255, 255, 255, 0.3);
+      border-top: 6px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 100px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .card-container.loading .loading-spinner {
+      display: block;
+    }
+
+    .card-container.loading .card {
+      display: none;
+    }
+
+    .card-container.loading .no-more-events {
+      display: none !important;
+    }
+
+    .btn:disabled,
+    .control-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .undo-container {
+      margin-top: 15px;
+      text-align: center;
+    }
+
+    .undo-btn {
+      padding: 8px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.9em;
+      transition: all 0.2s ease;
+      display: none;
+    }
+
+    .undo-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: #00E5CC;
+      transform: scale(1.05);
+    }
+
+    .undo-btn.visible {
+      display: inline-block;
+    }
+
+    .hint {
+      color: rgba(255, 255, 255, 0.8);
+      text-align: center;
+      margin-top: 20px;
+      font-size: 0.9em;
+    }
+
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0);
+      backdrop-filter: blur(0px);
+      -webkit-backdrop-filter: blur(0px);
+      z-index: 1000;
+      display: none;
+      pointer-events: none;
+      transition: background 0.4s cubic-bezier(0.32, 0.72, 0, 1),
+                  backdrop-filter 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .overlay.visible {
+      display: flex;
+      pointer-events: auto;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    .overlay-content {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      border-radius: 20px 20px 0 0;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: 0 -5px 30px rgba(0, 0, 0, 0.3);
+      will-change: transform;
+    }
+
+    .overlay.visible .overlay-content {
+      transform: translateY(0);
+    }
+
+    .overlay-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 24px 16px;
+      border-bottom: 1px solid #e8eaf6;
+      flex-shrink: 0;
+    }
+
+    .overlay-header h2 {
+      margin: 0;
+      font-size: 1.4em;
+      color: #000000;
+      font-weight: 800;
+    }
+
+    .overlay-header h2::before {
+      content: "/";
+      color: #FF006B;
+      margin-right: 6px;
+      font-weight: 300;
+    }
+
+    .close-btn {
+      background: #f0f0f5;
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1.2em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4a4a68;
+      transition: all 0.2s ease;
+    }
+
+    .close-btn:hover {
+      background: #e0e0ea;
+      transform: scale(1.1);
+    }
+
+    .overlay-body {
+      overflow-y: auto;
+      padding: 16px 24px 24px;
+      flex: 1;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .overlay-body::-webkit-scrollbar {
+      display: none;
+    }
+
+    .selected-event-card {
+      background: #fafbff;
+      border: 1px solid #e8eaf6;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .selected-event-card:hover {
+      background: #f5f6ff;
+      border-color: #667eea;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+    }
+
+    .selected-event-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .selected-event-title {
+      font-size: 1.1em;
+      font-weight: 800;
+      color: #000000;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+    .selected-event-title::before {
+      content: "/";
+      color: #FF006B;
+      margin-right: 4px;
+      font-weight: 300;
+      font-size: 0.95em;
+    }
+
+    .selected-event-meta {
+      font-size: 0.9em;
+      color: #4a4a68;
+      line-height: 1.5;
+    }
+
+    .selected-event-meta-item {
+      margin-bottom: 4px;
+    }
+
+    .selected-event-meta-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #8a8a9a;
+    }
+
+    .empty-state-icon {
+      font-size: 3em;
+      margin-bottom: 16px;
+    }
+
+    .empty-state-text {
+      font-size: 1.1em;
+      font-weight: 500;
+    }
+
+    .about-content {
+      padding: 20px 24px 24px;
+    }
+
+    .about-content p {
+      color: #2d2d44;
+      line-height: 1.7;
+      margin-bottom: 16px;
+      font-size: 1em;
+    }
+
+    .about-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    .about-content strong {
+      color: #FF006B;
+      font-weight: 700;
+    }
+
+    .author-link {
+      color: #FF006B;
+      font-weight: 700;
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: border-color 0.2s ease;
+    }
+
+    .author-link:hover {
+      border-bottom-color: #FF006B;
+    }
+
+    .export-content {
+      padding: 20px 24px 24px;
+    }
+
+    .export-intro {
+      color: #2d2d44;
+      font-size: 1.05em;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .export-instructions h3 {
+      color: #1a1a2e;
+      font-size: 1.1em;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .export-instructions ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 24px 0;
+    }
+
+    .export-instructions li {
+      padding: 12px 0;
+      border-bottom: 1px solid #e8eaf6;
+      color: #2d2d44;
+    }
+
+    .export-instructions li:last-child {
+      border-bottom: none;
+    }
+
+    .export-instructions strong {
+      color: #1a1a2e;
+      font-weight: 700;
+      margin-right: 8px;
+    }
+
+    .export-instructions a {
+      color: #667eea;
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s ease;
+    }
+
+    .export-instructions a:hover {
+      border-bottom-color: #667eea;
+    }
+
+    .export-cta {
+      text-align: center;
+      padding-top: 16px;
+      border-top: 2px solid #e8eaf6;
+    }
+
+    .export-download-btn {
+      background: #FF006B;
+      color: white;
+      border: none;
+      padding: 16px 48px;
+      border-radius: 30px;
+      font-size: 1.1em;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(255, 0, 107, 0.3);
+      margin-bottom: 12px;
+    }
+
+    .export-download-btn:hover {
+      background: #E6005F;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 0, 107, 0.4);
+    }
+
+    .export-download-btn:active {
+      transform: translateY(0);
+    }
+
+    .export-count {
+      color: #6a6a82;
+      font-size: 0.9em;
+      margin: 0;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 16px;
+      }
+
+      .header {
+        margin-bottom: 10px;
+        min-height: 38px;
+      }
+
+      .card-container {
+        height: 600px;
+      }
+
+      .card-header {
+        padding: clamp(18px, 3.5vw, 20px) 20px 16px;
+      }
+
+      .btn {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5em;
+      }
+
+      .buttons {
+        margin-top: 20px;
+        gap: 25px;
+      }
+
+      .hint {
+        font-size: clamp(0.8em, 2vw, 0.85em);
+        margin-top: 16px;
+      }
+
+      .controls {
+        margin-top: 20px;
+        gap: 10px;
+      }
+
+      .control-btn {
+        padding: 10px 18px;
+        font-size: clamp(0.85em, 2vw, 0.9em);
+      }
+
+      .overlay-content {
+        max-height: 85vh;
+      }
+
+      .overlay-header {
+        padding: 20px 20px 14px;
+      }
+
+      .overlay-header h2 {
+        font-size: 1.25em;
+      }
+
+      .overlay-body {
+        padding: 12px 20px 20px;
+      }
+
+      .selected-event-card {
+        padding: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📅 M2020 Events</h1>
+    <div class="counter">
+      <span class="counter-number" id="selected-count">0</span> saved · <span class="counter-number" id="remaining-count">0</span> left
+    </div>
+  </div>
+
+  <div class="card-container" id="card-container">
+    <div class="loading-spinner"></div>
+    <div class="no-more-events" id="no-more">
+      🎉 All done! Check your selected events below.
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button class="btn btn-dislike" id="btn-dislike" title="Press Left Arrow">✕</button>
+    <button class="btn btn-like" id="btn-like" title="Press Right Arrow">♥</button>
+  </div>
+
+  <div class="undo-container">
+    <button class="undo-btn" id="undo-btn">↶ Undo</button>
+  </div>
+
+  <div class="hint">
+    👈 Swipe left to skip | Swipe right to save 👉<br>
+    Use arrow keys on desktop
+  </div>
+
+  <div class="controls">
+    <button class="control-btn" id="view-selected">View Selected</button>
+    <button class="control-btn" id="reset">Reset All</button>
+    <button class="control-btn" id="export">Export to File</button>
+    <button class="control-btn" id="about">About</button>
+  </div>
+
+  <div class="overlay" id="selected-overlay">
+    <div class="overlay-content">
+      <div class="overlay-header">
+        <h2>Selected Events</h2>
+        <button class="close-btn" id="close-overlay">✕</button>
+      </div>
+      <div class="overlay-body" id="overlay-body">
+        <!-- Selected events will be rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="about-overlay">
+    <div class="overlay-content">
+      <div class="overlay-header">
+        <h2>About</h2>
+        <button class="close-btn" id="close-about">✕</button>
+      </div>
+      <div class="overlay-body about-content">
+        <p>This app was made by <a href="https://www.linkedin.com/in/tylermcintyre" target="_blank" rel="noopener noreferrer" class="author-link">Tyler McIntyre</a> to help sort through the content at Money 2020. It is not an official app nor affiliated with Money 2020. If you are there feel free to say hi to him.</p>
+
+        <p>This app does not transmit data to any servers (except to fetch the list of events from M2020). It is run locally on your machine and data is stored on your machine only for privacy reasons!</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="export-overlay">
+    <div class="overlay-content">
+      <div class="overlay-header">
+        <h2>Export Calendar</h2>
+        <button class="close-btn" id="close-export">✕</button>
+      </div>
+      <div class="overlay-body export-content">
+        <p class="export-intro">Download your selected events as a calendar file (.ics) to add them to your calendar app.</p>
+
+        <div class="export-instructions">
+          <h3>How to Import:</h3>
+          <ul>
+            <li>
+              <strong>Google Calendar:</strong>
+              <a href="https://support.google.com/calendar/answer/37118" target="_blank" rel="noopener noreferrer">Import ICS file guide</a>
+            </li>
+            <li>
+              <strong>Outlook:</strong>
+              <a href="https://support.microsoft.com/en-us/office/import-calendars-into-outlook-8e8364e1-400e-4c0f-a573-fe76b5a2d379" target="_blank" rel="noopener noreferrer">Import ICS file guide</a>
+            </li>
+          </ul>
+        </div>
+
+        <div class="export-cta">
+          <button class="export-download-btn" id="download-ics">Download ICS File</button>
+          <p class="export-count" id="export-count">0 events ready to export</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

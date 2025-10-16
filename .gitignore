@@ -1,0 +1,35 @@
+# AI Assistant Files
+AGENTS.md
+CLAUDE.md
+.claude/
+
+# Generated Downloads
+selected-events-*.json
+money2020-events-*.ics
+*.ics
+
+# Playwright MCP Files
+.playwright-mcp/
+
+# macOS
+.DS_Store
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Cache
+.cache/
+
+# Node modules (if using local tools)
+node_modules/
+
+# Environment files
+.env
+.env.local
