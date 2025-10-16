@@ -12,7 +12,11 @@ let selectedEvents = loadStoredSelections();
 
 let isDragging = false;
 let startX = 0;
+let startY = 0;
 let currentX = 0;
+let currentY = 0;
+let swipeDirectionDetermined = false;
+let isVerticalScroll = false;
 
 let lastAction = null; // Track last action for undo functionality
 let actionInProgress = false; // Prevent double-actions
@@ -440,33 +444,67 @@ function attachSwipeListeners(card) {
 }
 
 function handleDragStart(event) {
-  // Don't start dragging if loading or if user is interacting with scrollable content
+  // Don't start dragging if loading
   if (isLoading) return;
 
-  const target = event.target;
-  const description = target.closest('.event-description');
-  const speakers = target.closest('.speakers-section');
+  // Reset swipe state
+  isDragging = true;
+  swipeDirectionDetermined = false;
+  isVerticalScroll = false;
 
-  if (description || speakers) {
-    return; // Allow scrolling in these areas
+  // Store initial touch/mouse position
+  if (event.type.includes('mouse')) {
+    startX = event.clientX;
+    startY = event.clientY;
+  } else {
+    startX = event.touches[0].clientX;
+    startY = event.touches[0].clientY;
   }
 
-  isDragging = true;
-  startX = event.type.includes('mouse') ? event.clientX : event.touches[0].clientX;
   currentX = startX;
+  currentY = startY;
 }
 
 function handleDragMove(event) {
   if (!isDragging) return;
 
+  // Get current position
   if (event.type.includes('touch')) {
     currentX = event.touches[0].clientX;
-    event.preventDefault();
+    currentY = event.touches[0].clientY;
   } else {
     currentX = event.clientX;
+    currentY = event.clientY;
   }
 
   const diffX = currentX - startX;
+  const diffY = currentY - startY;
+
+  // Determine swipe direction on first significant movement
+  if (!swipeDirectionDetermined && (Math.abs(diffX) > 10 || Math.abs(diffY) > 10)) {
+    swipeDirectionDetermined = true;
+
+    // Check if user is trying to scroll vertically
+    const target = event.target || event.touches?.[0]?.target;
+    const description = target?.closest('.event-description');
+    const speakers = target?.closest('.speakers-section');
+
+    // If in scrollable area AND moving more vertically than horizontally, it's a scroll
+    if ((description || speakers) && Math.abs(diffY) > Math.abs(diffX)) {
+      isVerticalScroll = true;
+      isDragging = false; // Stop card dragging, allow native scroll
+      return;
+    }
+  }
+
+  // If determined to be vertical scroll, don't interfere
+  if (isVerticalScroll) return;
+
+  // Prevent default for horizontal swipes on touch devices
+  if (event.type.includes('touch') && Math.abs(diffX) > Math.abs(diffY)) {
+    event.preventDefault();
+  }
+
   const card = document.querySelector('.card');
   if (!card) return;
 
@@ -485,8 +523,13 @@ function handleDragMove(event) {
 }
 
 function handleDragEnd() {
-  if (!isDragging) return;
+  // Reset state
+  const wasDragging = isDragging;
   isDragging = false;
+  swipeDirectionDetermined = false;
+  isVerticalScroll = false;
+
+  if (!wasDragging) return;
 
   const diffX = currentX - startX;
   const card = document.querySelector('.card');
