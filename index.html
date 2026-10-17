@@ -3,19 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0B0E14">
-  <meta name="color-scheme" content="dark">
-  <meta name="description" content="Swipe through the Money20/20 USA 2026 agenda, save the sessions you want and add them all to your calendar in one tap. Unofficial.">
-  <title>M2020 Picks — session swiper (unofficial)</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230B0E14'/%3E%3Crect x='7' y='8.5' width='18' height='16.5' rx='3' fill='none' stroke='%238FA3FF' stroke-width='2.5'/%3E%3Cpath d='M7 14h18M12 6v4.5M20 6v4.5' fill='none' stroke='%238FA3FF' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+  <!-- theme.js keeps these two in step with the chosen light/dark theme before first paint -->
+  <meta name="theme-color" content="#09090B">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="Swipe through the Money20/20 USA 2026 agenda, save the sessions you want and add them all to your calendar in one tap. Unofficial, not affiliated with Money20/20.">
+  <meta name="application-name" content="M2020 Events">
+  <meta name="apple-mobile-web-app-title" content="M2020 Events">
+  <meta property="og:site_name" content="M2020 Events">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="M2020 Events — Money20/20 USA 2026 session swiper (unofficial)">
+  <meta property="og:description" content="Swipe through the Money20/20 USA 2026 agenda, save the sessions you want and add them all to your calendar in one tap. Unofficial, not affiliated with Money20/20.">
+  <title>M2020 Events — Money20/20 USA 2026 session swiper (unofficial)</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23FF005A'/%3E%3Cpath d='M12 25.2L19.8 6.8' fill='none' stroke='%23000' stroke-width='4.6' stroke-linecap='round'/%3E%3C/svg%3E">
+  <!-- theme.js runs before the stylesheets apply, so <html data-theme> is already right on the first paint (no flash) -->
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="filters.css">
   <link rel="stylesheet" href="export.css">
   <link rel="stylesheet" href="toast.css">
+  <link rel="stylesheet" href="onboarding.css">
 </head>
 <body>
   <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
-    <symbol id="i-logo" viewBox="0 0 24 24"><rect x="8.5" y="2.5" width="11.5" height="15.5" rx="2.5" transform="rotate(12 14.25 10.25)" opacity="0.5"/><rect x="4" y="5.5" width="11.5" height="15.5" rx="2.5"/><path d="M7.4 13.4l2 2 3.4-3.6"/></symbol>
+    <!-- Brand mark: Money20/20-style pink tile with a black slash. Self-coloured (ignores currentColor); the colours come from --brand-pink / --brand-ink in styles.css. -->
+    <symbol id="i-logo" viewBox="0 0 24 24"><rect width="24" height="24" rx="6.5" style="fill:var(--brand-pink,#FF005A);stroke:none"/><path d="M9.3 18.4L14.7 5.6" stroke-width="3.2" stroke-linecap="round" style="stroke:var(--brand-ink,#000)"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2z"/></symbol>
+    <symbol id="i-contrast" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></symbol>
     <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
     <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 3.5h10A1.5 1.5 0 0 1 18.5 5v15.5L12 16.5l-6.5 4V5A1.5 1.5 0 0 1 7 3.5z"/></symbol>
     <symbol id="i-bookmark-plus" viewBox="0 0 24 24"><path d="M7 3.5h10A1.5 1.5 0 0 1 18.5 5v15.5L12 16.5l-6.5 4V5A1.5 1.5 0 0 1 7 3.5z"/><path d="M12 7.5v6M9 10.5h6"/></symbol>
@@ -38,10 +52,10 @@
 
   <div class="app" id="app">
     <header class="app-header">
-      <div class="brand">
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-logo"></use></svg>
-        <span>M2020 Picks</span>
-      </div>
+      <h1 class="brand">
+        <svg class="icon brand-mark" aria-hidden="true" focusable="false"><use href="#i-logo"></use></svg>
+        <span class="brand-name">M2020 <span class="brand-sub">Events</span></span>
+      </h1>
       <nav class="header-actions" aria-label="App">
         <button type="button" class="hdr-btn" id="open-filters" aria-haspopup="dialog" aria-controls="filters-overlay" aria-expanded="false" data-active="false" aria-label="Filters" title="Filters (F)">
           <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-filter"></use></svg>
@@ -178,6 +192,18 @@
           </button>
         </li>
         <li>
+          <button type="button" class="menu-item" id="open-setup">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-filter"></use></svg>
+            Personalize &amp; how it works
+          </button>
+        </li>
+        <li>
+          <button type="button" class="menu-item" id="theme-toggle">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-info"></use></svg>
+            Theme: Auto
+          </button>
+        </li>
+        <li>
           <button type="button" class="menu-item" id="about" data-app-action="about">
             <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-info"></use></svg>
             About
@@ -209,6 +235,7 @@
 
   <div id="sr-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <div class="safe-probe" id="safe-probe" aria-hidden="true"></div>
+  <div id="onboarding-root"></div>
   <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
 
   <script src="core.js"></script>
@@ -217,6 +244,7 @@
   <script src="toast.js"></script>
   <script src="filters.js"></script>
   <script src="export-ui.js"></script>
+  <script src="onboarding.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

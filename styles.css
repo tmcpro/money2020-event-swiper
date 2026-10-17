@@ -1,53 +1,24 @@
 /*
- * styles.css - design tokens + app shell for M2020 Picks (M2020 Event Swiper).
- * Owner: UI agent. Token NAMES in the first block are frozen (see CONTRACTS.md); values follow the
- * UX direction (dark only). The second block adds the UX-direction aliases (--r-*, --d-*, --text-*, ...)
- * so feature stylesheets (filters.css, export.css, toast.css) can use either vocabulary.
- * Component rules below use tokens only (no raw colours).
+ * styles.css - design tokens + app shell for M2020 Events (unofficial Money20/20 USA 2026 session swiper).
+ * Token NAMES are frozen (see CONTRACTS.md); their values live in two palettes below. The second block of
+ * aliases (--r-*, --d-*, --text-*, ...) lets feature stylesheets (filters.css, export.css, toast.css,
+ * onboarding.css) use either vocabulary. Component rules use tokens only (no raw colours), so a theme is
+ * just a different set of token values:
+ *   :root, :root[data-theme="dark"]   dark palette (default)
+ *   :root[data-theme="light"]         light palette
+ * theme.js puts data-theme on <html> before first paint, from the saved preference or (for "auto") from
+ * prefers-color-scheme, and keeps <meta name="color-scheme"> / <meta name="theme-color"> in step.
+ *
+ * Brand: Money20/20 hot pink (#FF005A, taken from us.money2020.com) with black and white. Pink *text* only
+ * reaches AA when it is lighter than the brand pink on dark and deeper on light, so --color-accent differs per
+ * theme (every accent use, text or fill, passes AA in both). The exact brand pink stays available as
+ * --brand-pink for non-text marks (logo, progress bar). Not the official Money20/20 logo or typeface.
  */
 
 :root {
-  color-scheme: dark;
-
-  /* ---- Colour (frozen names) ---- */
-  --color-bg: #0B0E14;              /* page canvas */
-  --color-on-bg: #EDF1F7;           /* text/icons directly on the canvas */
-  --color-on-bg-muted: #9AA4B8;
-  --color-surface: #151A23;         /* cards, sheets, dialogs, toasts */
-  --color-surface-2: #1F2632;       /* chips, inputs, list rows, skip button */
-  --color-surface-3: #283142;       /* hover / pressed fill on surface-2 */
-  --color-text: #EDF1F7;            /* 15.4:1 on surface */
-  --color-text-strong: #FFFFFF;
-  --color-text-muted: #9AA4B8;      /* 7.0:1 on surface, 6.0:1 on surface-2 */
-  --color-border: #2B3444;
-  --color-accent: #8FA3FF;          /* links, focus, selected chips, progress, primary CTA */
-  --color-accent-hover: #A8B7FF;
-  --color-accent-contrast: #0B0E14; /* text/icons on accent, like, dislike, danger, warning */
-  --color-accent-2: #3DD68C;        /* secondary accent (= like) */
-  --color-accent-2-hover: #5FE0A2;
-  --color-accent-2-contrast: #0B0E14;
-  --color-like: #3DD68C;
-  --color-dislike: #FF6B7A;
-  --color-success: #3DD68C;
-  --color-danger: #FF5C6C;
-  --color-warning: #FFC24B;
-  --color-info: #6FB6FF;
-  --color-overlay: rgba(5, 7, 12, 0.62);
-  --color-focus: #8FA3FF;
-
-  /* ---- Colour (additions) ---- */
-  /* 18% tints on --color-surface (color-mix(in srgb, X 18%, var(--color-surface)) precomputed) */
-  --color-accent-tint: #2B334B;
-  --color-like-tint: #1C3C36;
-  --color-dislike-tint: #3F2933;
-  --color-danger-tint: #3F2630;
-  --color-glow: #131722;            /* accent 6% on bg: desktop backdrop glow */
-  --avatar-0: hsl(210, 45%, 32%);
-  --avatar-1: hsl(250, 45%, 32%);
-  --avatar-2: hsl(290, 45%, 32%);
-  --avatar-3: hsl(20, 45%, 32%);
-  --avatar-4: hsl(150, 45%, 32%);
-  --avatar-5: hsl(180, 45%, 32%);
+  /* ---- Brand constants (same in both themes; non-text marks only) ---- */
+  --brand-pink: #FF005A;            /* Money20/20 hot pink: 5.4:1 on black, 3.9:1 on white (graphics, not text) */
+  --brand-ink: #000000;             /* ink on --brand-pink: 5.4:1 */
 
   /* ---- Typography (frozen names) ---- */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
@@ -96,15 +67,10 @@
   --r-pill: var(--radius-pill);
   --r-sheet: 20px 20px 0 0;
 
-  /* ---- Elevation (dark UI = hairline + shadow) ---- */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--color-border);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--color-border);
+  /* ---- Elevation aliases (the shadows themselves are per theme, below) ---- */
   --shadow-1: var(--shadow-sm);
   --shadow-card: var(--shadow-lg);
   --shadow-toast: var(--shadow-md);
-  --shadow-sheet: 0 -12px 48px rgba(0, 0, 0, 0.6);
-  --shadow-panel: -12px 0 48px rgba(0, 0, 0, 0.6);
 
   /* ---- Layers ---- */
   --z-header: 10;
@@ -135,6 +101,154 @@
   --content-max: 560px;
   --panel-w: 420px;
   --dialog-w: 480px;
+}
+
+/* ============================== Palette: dark (default) ============================== */
+/* Near-black canvas, neutral grey surfaces, Money20/20 pink lightened to 62.5% so pink text keeps >= 4.5:1
+   on every surface and on its own 18% tint. Contrast figures are WCAG ratios. */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ---- Colour (frozen names) ---- */
+  --color-bg: #09090B;              /* page canvas */
+  --color-on-bg: #F5F5F7;           /* text/icons directly on the canvas (18.3:1) */
+  --color-on-bg-muted: #A6A6B2;     /* 8.3:1 on bg */
+  --color-surface: #111114;         /* cards, sheets, dialogs, toasts */
+  --color-surface-2: #1A1A1F;       /* chips, inputs, list rows, skip button */
+  --color-surface-3: #25252B;       /* hover / pressed fill on surface-2 */
+  --color-text: #F5F5F7;            /* 17.3:1 on surface */
+  --color-text-strong: #FFFFFF;
+  --color-text-muted: #A6A6B2;      /* 7.8:1 on surface, 7.2:1 on surface-2, 6.3:1 on surface-3 */
+  --color-border: #2D2D34;
+  --color-accent: #FF407F;          /* links, focus, selected chips, progress, primary CTA: 5.7:1 on surface, 4.6:1 on its 18% tint */
+  --color-accent-hover: #FF6B9E;
+  --color-accent-contrast: #09090B; /* text/icons on accent (6.0:1), like, dislike, danger, warning */
+  --color-accent-2: #3DD68C;        /* secondary accent (= like) */
+  --color-accent-2-hover: #5FE0A2;
+  --color-accent-2-contrast: #09090B;
+  --color-like: #3DD68C;
+  --color-dislike: #FF7A45;         /* orange-red: stays clearly apart from the pink accent */
+  --color-success: #3DD68C;
+  --color-danger: #FF5C4D;
+  --color-warning: #FFAD33;
+  --color-info: #6FB6FF;
+  --color-overlay: rgba(0, 0, 0, 0.66);
+  --color-focus: #FF407F;
+
+  /* ---- Colour (additions) ---- */
+  /* 14-18% tints on --color-surface (color-mix(in srgb, X 18%, var(--color-surface)) precomputed) */
+  --color-accent-tint: #321823;     /* 14%: accent text on it is 4.9:1 */
+  --color-like-tint: #19342A;
+  --color-dislike-tint: #3C241D;
+  --color-danger-tint: #3C1E1E;
+  --color-glow: #15090F;            /* brand pink 5% on bg: desktop backdrop glow */
+  --avatar-0: hsl(210, 45%, 32%);
+  --avatar-1: hsl(250, 45%, 32%);
+  --avatar-2: hsl(290, 45%, 32%);
+  --avatar-3: hsl(20, 45%, 32%);
+  --avatar-4: hsl(150, 45%, 32%);
+  --avatar-5: hsl(180, 45%, 32%);
+
+  /* ---- Day colours (contract with the card / filter / saved-list day badges) ----
+     --day-X        solid fill: vivid, distinct from each other and from like (green) and dislike (orange-red)
+     --day-X-ink    text/icon colour on the solid fill (>= 6.9:1)
+     --day-X-soft   16% tint of the solid on --color-surface: chip / header background (--color-text is >= 12.3:1 on it)
+     --day-X-text   the colour to use for day-coloured *text* on surface or soft (>= 5.2:1; = solid on dark) */
+  --day-sun: #FFC81F;
+  --day-sun-ink: #09090B;
+  --day-sun-soft: #372E16;
+  --day-sun-text: #FFC81F;
+  --day-mon: #33CFF0;
+  --day-mon-ink: #09090B;
+  --day-mon-soft: #162F37;
+  --day-mon-text: #33CFF0;
+  --day-tue: #8F8CFF;
+  --day-tue-ink: #09090B;
+  --day-tue-soft: #25253A;
+  --day-tue-text: #8F8CFF;
+  --day-wed: #E37AFF;
+  --day-wed-ink: #09090B;
+  --day-wed-soft: #33223A;
+  --day-wed-text: #E37AFF;
+
+  /* ---- Elevation (dark UI = hairline + deep shadow) ---- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--color-border);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--color-border);
+  --shadow-sheet: 0 -12px 48px rgba(0, 0, 0, 0.65);
+  --shadow-panel: -12px 0 48px rgba(0, 0, 0, 0.65);
+}
+
+/* ============================== Palette: light ============================== */
+/* Soft grey canvas with white cards. Pink deepens to #BA005D (white on it 6.5:1; on its 18% tint 4.6:1) and the
+   status colours deepen with it so white (--color-accent-contrast) stays readable on every fill. */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg: #F4F4F6;
+  --color-on-bg: #0B0B0E;           /* 17.9:1 on bg */
+  --color-on-bg-muted: #5A5A66;     /* 6.2:1 on bg */
+  --color-surface: #FFFFFF;
+  --color-surface-2: #EFEFF3;
+  --color-surface-3: #E3E3E9;
+  --color-text: #0B0B0E;            /* 19.7:1 on surface */
+  --color-text-strong: #000000;
+  --color-text-muted: #5A5A66;      /* 6.8:1 on surface, 5.9:1 on surface-2, 5.3:1 on surface-3 */
+  --color-border: #D8D8E0;
+  --color-accent: #BA005D;          /* 6.5:1 on surface, 5.6:1 on surface-2, 4.6:1 on its 18% tint */
+  --color-accent-hover: #95004A;
+  --color-accent-contrast: #FFFFFF;
+  --color-accent-2: #0B8556;
+  --color-accent-2-hover: #09704A;
+  --color-accent-2-contrast: #FFFFFF;
+  --color-like: #0B8556;
+  --color-dislike: #C9371B;
+  --color-success: #0B8556;
+  --color-danger: #BC2218;
+  --color-warning: #8F5200;
+  --color-info: #0B62BD;
+  --color-overlay: rgba(12, 12, 20, 0.5);
+  --color-focus: #BA005D;
+
+  --color-accent-tint: #F6DEEA;     /* 13%: accent text on it is 5.1:1 */
+  --color-like-tint: #DDEEE7;
+  --color-dislike-tint: #F7E3DF;
+  --color-danger-tint: #F7E1DF;
+  --color-glow: #F5E8EE;            /* brand pink 5% on bg */
+  --avatar-0: hsl(210, 70%, 88%);
+  --avatar-1: hsl(250, 70%, 90%);
+  --avatar-2: hsl(290, 65%, 90%);
+  --avatar-3: hsl(20, 80%, 88%);
+  --avatar-4: hsl(150, 55%, 84%);
+  --avatar-5: hsl(180, 55%, 82%);
+
+  /* Day colours: SUN/MON are bright with dark ink, TUE/WED are deep with white ink; --day-X-text is the
+     darker shade for coloured text on white or on the soft tint (>= 5.2:1). */
+  --day-sun: #F5BC00;
+  --day-sun-ink: #1A1000;
+  --day-sun-soft: #FEF6DB;
+  --day-sun-text: #775400;
+  --day-mon: #0FB5DB;
+  --day-mon-ink: #04161B;
+  --day-mon-soft: #DDF5FA;
+  --day-mon-text: #0A6C86;
+  --day-tue: #5B52EA;
+  --day-tue-ink: #FFFFFF;
+  --day-tue-soft: #E8E7FC;
+  --day-tue-text: #4A40D6;
+  --day-wed: #B02BD1;
+  --day-wed-ink: #FFFFFF;
+  --day-wed-soft: #F4E1F9;
+  --day-wed-text: #9322B0;
+
+  --shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.14);
+  --shadow-md: 0 8px 24px rgba(20, 20, 40, 0.14), 0 0 0 1px var(--color-border);
+  --shadow-lg: 0 12px 32px rgba(20, 20, 40, 0.14), 0 0 0 1px var(--color-border);
+  --shadow-sheet: 0 -8px 40px rgba(20, 20, 40, 0.18);
+  --shadow-panel: -8px 0 40px rgba(20, 20, 40, 0.18);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -200,6 +314,11 @@ button {
 a {
   color: var(--color-accent);
   -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--color-accent-tint);
+  color: var(--color-text-strong);
 }
 
 svg.icon {
@@ -285,22 +404,35 @@ svg.icon {
   background: var(--color-bg);
 }
 
+/* Wordmark: pink slash tile (sprite #i-logo, self-coloured) + "M2020 Events". Unofficial; not the Money20/20 logo. */
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 10px;
   min-width: 0;
   color: var(--color-text);
-  font-size: 15px;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.01em;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: var(--font-weight-heavy);
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
 .brand svg.icon {
-  width: 24px;
-  height: 24px;
-  color: var(--color-accent);
+  width: 26px;
+  height: 26px;
+}
+
+.brand-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-sub {
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.01em;
+  color: var(--color-text-muted);
 }
 
 .header-actions {
@@ -372,7 +504,7 @@ svg.icon {
 
 .progress-fill {
   height: 100%;
-  background: var(--color-accent);
+  background: var(--brand-pink);
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform var(--d-base) var(--ease-out);
@@ -1760,7 +1892,7 @@ kbd {
   }
 
   .brand {
-    font-size: 16px;
+    font-size: 17px;
   }
 
   .action-bar::before {

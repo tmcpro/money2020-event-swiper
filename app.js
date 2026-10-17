@@ -1,5 +1,5 @@
 /*
- * app.js - M2020 Picks shell: data loading, deck + swipe physics, keyboard, saved list, menu/about,
+ * app.js - M2020 Events shell: data loading, deck + swipe physics, keyboard, saved list, menu/about,
  * deck states, first-run hint, modal/focus management for every .overlay.
  * Depends on (loaded first, see index.html): core.js (M2020Core), venues.js (M2020Venues), calendar.js,
  * toast.js (Toast), filters.js (Filters), export-ui.js (ExportUI). See CONTRACTS.md.
@@ -655,10 +655,63 @@ function durationLabel(session) {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
-// "Sun · Oct 18"
-function dayLabel(session) {
-  const short = Core.formatDateShort(session.dateIso);
-  return short ? short.replace(', ', ' · ') : 'Date TBA';
+// --- Day identity: every conference day has its own colour (SUN / MON / TUE / WED), so the day of a
+// session is recognisable at a glance. The key is computed from the date (never hard-coded) and goes on
+// data-day; the palette and the rules live in the "Day identity" block of filters.css (tokens: styles.css).
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+// "2026-10-18" -> Date at UTC midnight (null when the date is missing or invalid)
+function dayDate(dateIso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(Core.normalizeDateIso(dateIso));
+  if (!m) return null;
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+// "2026-10-18" -> 'sun' ('' when the date is unknown)
+function dayKey(dateIso) {
+  const dt = dayDate(dateIso);
+  return dt ? DAY_KEYS[dt.getUTCDay()] : '';
+}
+
+// "Oct 18"
+function dayMonthDay(dateIso) {
+  const short = Core.formatDateShort(Core.normalizeDateIso(dateIso)); // "Sun, Oct 18"
+  return short ? short.replace(/^[^,]*,\s*/, '') : '';
+}
+
+// "Sunday, October 18" (what screen readers get instead of the abbreviations)
+let dayLongFormat = null;
+function dayLongLabel(dateIso) {
+  const dt = dayDate(dateIso);
+  if (!dt) return '';
+  try {
+    if (!dayLongFormat) {
+      dayLongFormat = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
+    }
+    return dayLongFormat.format(dt);
+  } catch (error) {
+    return Core.formatDateLong(Core.normalizeDateIso(dateIso));
+  }
+}
+
+// ` data-day="sun"` (or '' for an unknown date: the CSS then falls back to neutral colours)
+function dayAttr(dateIso) {
+  const key = dayKey(dateIso);
+  return key ? ` data-day="${key}"` : '';
+}
+
+// The day badge: a solid pill in the day's colour, "SUN" big and heavy + "Oct 18" lighter. The text always
+// names the day (colour is a second channel, never the only one); size is '' (card) or 'lg' (saved banner).
+function dayBadgeHtml(dateIso, size) {
+  const cls = `day-badge${size ? ` day-badge--${size}` : ''}`;
+  const key = dayKey(dateIso);
+  if (!key) return `<span class="${cls} day-badge--tba"><span class="day-badge__date">Date TBA</span></span>`;
+  return `<span class="${cls}" data-day="${key}">` +
+    `<span class="day-badge__dow" aria-hidden="true">${esc(Core.weekdayShort(Core.normalizeDateIso(dateIso)))}</span>` +
+    `<span class="day-badge__date" aria-hidden="true">${esc(dayMonthDay(dateIso))}</span>` +
+    `<span class="sr-only">${esc(dayLongLabel(dateIso))}</span>` +
+    '</span>';
 }
 
 function formatLabel(eventType) {
@@ -779,12 +832,13 @@ function cardHtml(session, isPeek) {
         <a class="map-link" href="${esc(v.mapUrl)}" target="_blank" rel="noopener noreferrer" draggable="false"
            aria-label="Floor map for ${esc(v.room)} (opens in a new tab)">${icon('map')}<span>Map</span></a>` : '';
   return `
+    <div class="card-day-bar" aria-hidden="true"></div>
     <div class="card-stamp card-stamp--save" aria-hidden="true">Save</div>
     <div class="card-stamp card-stamp--skip" aria-hidden="true">Skip</div>
     <div class="card-scroll">
     <div class="card-head">
       <div class="card-eyebrow">
-        <span class="eyebrow">${esc(dayLabel(session))}</span>
+        ${dayBadgeHtml(session.dateIso)}
         ${format ? `<span class="chip chip--format">${esc(format)}</span>` : ''}
       </div>
       <h2 class="card-title"${isPeek ? '' : ` id="card-title-${esc(idOf(session))}"`}>${esc(session.title)}</h2>
@@ -815,6 +869,8 @@ function buildCard(session, isPeek) {
   const card = document.createElement('article');
   card.className = isPeek ? 'session-card session-card--peek' : 'card session-card';
   card.dataset.eventId = idOf(session);
+  const day = dayKey(session.dateIso);
+  if (day) card.dataset.day = day;
   if (isPeek) {
     card.setAttribute('aria-hidden', 'true');
     card.inert = true;
@@ -1448,7 +1504,7 @@ function savedRowHtml(session) {
   const start = clock(session.startTime, true) || 'Time TBA';
   const end = session.endTime && session.endTime !== session.startTime ? clock(session.endTime, true) : '';
   return `
-    <li class="saved-row" data-id="${esc(key)}">
+    <li class="saved-row" data-id="${esc(key)}"${dayAttr(session.dateIso)}>
       <p class="saved-time">${esc(start)}${end ? `<span class="saved-time-end">– ${esc(end)}</span>` : ''}</p>
       <div class="saved-main">
         <p class="saved-title">${esc(session.title)}</p>
@@ -1485,16 +1541,23 @@ function renderSaved() {
   list.forEach((s) => {
     const key = s.dateIso || 'tba';
     if (!current || current.key !== key) {
-      current = { key, label: s.dateIso ? Core.formatDateShort(s.dateIso) : 'Date TBA', items: [] };
+      current = { key, dateIso: s.dateIso || '', items: [] };
       groups.push(current);
     }
     current.items.push(s);
   });
+  // Each day opens with a sticky banner in that day's colour (same badge as on the cards); every row carries
+  // the day's colour as a marker too. The heading reads "Sunday, October 18, 3 sessions".
   savedBody.innerHTML = `
     <ul class="saved-list">
       ${groups.map((g) => `
-        <li class="saved-day">
-          <h3 class="saved-day-head eyebrow">${esc(g.label)} · ${plural(g.items.length, 'session')}</h3>
+        <li class="saved-day"${dayAttr(g.dateIso)}>
+          <h3 class="saved-day-head">
+            <span class="day-banner">
+              ${dayBadgeHtml(g.dateIso, 'lg')}
+              <span class="day-banner__count"><span class="sr-only">, </span>${esc(plural(g.items.length, 'session'))}</span>
+            </span>
+          </h3>
           <ul class="saved-rows">${g.items.map(savedRowHtml).join('')}</ul>
         </li>`).join('')}
     </ul>`;
@@ -1503,8 +1566,10 @@ function renderSaved() {
 function openSaved() {
   closeAppOverlays();
   renderSaved();
-  savedBody.scrollTop = 0;
   showOverlay(savedOverlay);
+  // After showOverlay: a scroller that is still display:none keeps its old offset, so the sheet would
+  // reopen halfway down the list (and under a stuck day banner).
+  savedBody.scrollTop = 0;
 }
 
 function removeSaved(key, button) {

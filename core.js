@@ -52,7 +52,7 @@
     websiteUrl: 'https://us.money2020.com',
     agendaUrl: 'https://us.money2020.com/agenda',
     appUrl: 'https://m2020.pages.dev',
-    appName: 'M2020 Picks'
+    appName: 'M2020 Events'
   });
 
   const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

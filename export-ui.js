@@ -12,12 +12,17 @@
  * Mobile: bottom sheet. >= 900px: centred 520px dialog (export.css). All data is escaped before innerHTML.
  * Phones (coarse pointer, < 900px): Google only adds calendars by URL in a computer browser, so its row copies
  * the link instead of opening Google, and the accent "primary" row is Apple Calendar (iOS) or Outlook (others).
+ * Preferred calendar: onboarding stores localStorage 'event-swiper-prefs'.calendar ('google' | 'outlookWork' |
+ * 'outlookPersonal' | 'apple' | 'file'). When set, that row is listed first, gets the accent treatment and a
+ * "Your calendar" badge ('file' puts the .ics download first instead). Phones keep Google's copy-link row either way.
  */
 (function (root) {
   'use strict';
 
   const DESKTOP_QUERY = '(min-width: 900px)';
   const CLOSE_MS = 500; // matches the shared .overlay hide convention (--duration-slow)
+  const PREFS_KEY = 'event-swiper-prefs';
+  const PREFERRED_KEYS = ['google', 'outlookWork', 'outlookPersonal', 'apple', 'file'];
 
   let rootEl = null;
   let getSelected = () => [];
@@ -78,6 +83,18 @@
   function primaryKey(phone) {
     if (!phone) return 'google';
     return platform() === 'ios' ? 'apple' : 'outlookWork';
+  }
+
+  // The calendar the person picked during onboarding ('' when none or storage is unavailable).
+  function preferredCalendar() {
+    try {
+      const raw = root.localStorage.getItem(PREFS_KEY);
+      const prefs = raw ? JSON.parse(raw) : null;
+      const key = prefs && typeof prefs.calendar === 'string' ? prefs.calendar : '';
+      return PREFERRED_KEYS.indexOf(key) !== -1 ? key : '';
+    } catch (error) {
+      return '';
+    }
   }
 
   // Calendar servers (Google, Microsoft, Apple) fetch the feed themselves, so it must live on a public origin.
@@ -193,7 +210,9 @@
     const href = links[opt.key];
     const target = opt.newTab ? ' target="_blank" rel="noopener noreferrer"' : '';
     const subId = `export-sub-${opt.key}`;
-    const cls = `export-option${ctx.primary === opt.key ? ' export-option--primary' : ''}`;
+    const isPreferred = ctx.preferred === opt.key;
+    const cls = `export-option${ctx.primary === opt.key ? ' export-option--primary' : ''}${isPreferred ? ' export-option--preferred' : ''}`;
+    const badge = isPreferred ? ' <span class="export-option__badge">Your calendar</span>' : '';
     if (ctx.phone && opt.key === 'google') {
       // On a phone Google Calendar opens without adding anything, so the row's main action is copying the link.
       return `
@@ -202,7 +221,7 @@
                 aria-describedby="${subId}">
           <span class="export-option__icon">${ICON_CAL}</span>
           <span class="export-option__text">
-            <span class="export-option__label">Copy ${esc(opt.label)} link</span>
+            <span class="export-option__label">Copy ${esc(opt.label)} link${badge}</span>
             <span class="export-option__sub" id="${subId}">${esc(GOOGLE_PHONE_SUB)}</span>
           </span>
           <span class="export-option__go">${ICON_COPY}</span>
@@ -215,7 +234,7 @@
            aria-describedby="${subId}">
           <span class="export-option__icon">${ICON_CAL}</span>
           <span class="export-option__text">
-            <span class="export-option__label">${esc(opt.label)}</span>
+            <span class="export-option__label">${esc(opt.label)}${badge}</span>
             <span class="export-option__sub" id="${subId}">${esc(opt.sub)}</span>
           </span>
           <span class="export-option__go">${ICON_EXT}</span>
@@ -233,13 +252,22 @@
     const links = current.links;
     const phone = isPhone();
     const nText = plural(n, 'session');
-    const ctx = { phone, primary: primaryKey(phone) };
+    // Preferred calendar (onboarding): that row first and accent-styled; 'file' leads with the .ics download.
+    const preferred = preferredCalendar();
+    const fileFirst = preferred === 'file';
+    const ctx = {
+      phone,
+      preferred,
+      primary: preferred ? (fileFirst ? '' : preferred) : primaryKey(phone)
+    };
+    const ordered = OPTIONS.slice().sort((a, b) => (b.key === preferred ? 1 : 0) - (a.key === preferred ? 1 : 0));
+    const onetapTitle = n === 1 ? 'One tap adds it' : `One tap adds all ${esc(n)}`;
 
     const subscribe = links ? `
       <section class="export-section" aria-labelledby="export-onetap">
-        <h3 class="export-eyebrow" id="export-onetap">${n === 1 ? 'One tap adds it' : `One tap adds all ${esc(n)}`}</h3>
+        <h3 class="export-eyebrow" id="export-onetap">${fileFirst ? `Or ${onetapTitle.charAt(0).toLowerCase()}${onetapTitle.slice(1)}` : onetapTitle}</h3>
         <ul class="export-options" role="list">
-          ${OPTIONS.map((opt) => optionRow(opt, links, ctx)).join('')}
+          ${ordered.map((opt) => optionRow(opt, links, ctx)).join('')}
         </ul>
         <button type="button" class="export-textbtn" data-export-copy="feed">Copy feed link for another calendar app</button>
         <div class="export-manual" data-export-manual hidden>
@@ -261,21 +289,10 @@
         </ul>
       </section>` : '';
 
-    rootEl.innerHTML = `
-      <div class="export-handle" aria-hidden="true"></div>
-      <header class="export-header">
-        <div class="export-header__text">
-          <h2 id="export-title" class="export-title">Add to calendar</h2>
-          <p class="export-subtitle" id="export-subtitle">${esc(nText)} · shown as free, so they won’t block your work calendar${
-            left > 0 ? ` · ${esc(plural(left, 'session'))} without a time left out` : ''}</p>
-        </div>
-        <button type="button" class="export-close" data-export-close aria-label="Close">${ICON_CLOSE}</button>
-      </header>
-      <div class="export-body">
-        ${subscribe}
-        <section class="export-section export-download" aria-labelledby="export-download-title">
-          <h3 class="export-eyebrow" id="export-download-title">${links ? 'Or import a file' : 'Import a file'}</h3>
-          <button type="button" class="export-download-btn export-secondary" data-export-download>
+    const download = `
+        <section class="export-section export-download${fileFirst ? ' export-download--first' : ''}" aria-labelledby="export-download-title">
+          <h3 class="export-eyebrow" id="export-download-title">${links ? (fileFirst ? 'Your file' : 'Or import a file') : 'Import a file'}</h3>
+          <button type="button" class="export-download-btn export-secondary${fileFirst ? ' export-download-btn--preferred' : ''}" data-export-download>
             ${ICON_DOWNLOAD}<span>Download .ics file</span>
           </button>
           <p class="export-help">Importing by hand? Create a separate <strong>“Money20/20”</strong> calendar first and
@@ -292,7 +309,20 @@
               <dd>iPhone or iPad: open the downloaded file → Add All → pick the “Money20/20” calendar. Mac: File → New Calendar, then File → Import.</dd>
             </dl>
           </details>
-        </section>
+        </section>`;
+
+    rootEl.innerHTML = `
+      <div class="export-handle" aria-hidden="true"></div>
+      <header class="export-header">
+        <div class="export-header__text">
+          <h2 id="export-title" class="export-title">Add to calendar</h2>
+          <p class="export-subtitle" id="export-subtitle">${esc(nText)} · shown as free, so they won’t block your work calendar${
+            left > 0 ? ` · ${esc(plural(left, 'session'))} without a time left out` : ''}</p>
+        </div>
+        <button type="button" class="export-close" data-export-close aria-label="Close">${ICON_CLOSE}</button>
+      </header>
+      <div class="export-body">
+        ${fileFirst ? download + subscribe : subscribe + download}
         <p class="export-privacy">To build the feed, the IDs of your saved sessions are sent to m2020.pages.dev. Nothing else leaves your device.</p>
       </div>
     `;

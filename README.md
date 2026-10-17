@@ -1,4 +1,4 @@
-# M2020 Picks (M2020 Event Swiper)
+# M2020 Events (M2020 Event Swiper)
 
 An unofficial, Tinder-style session picker for **Money20/20 USA 2026** (Oct 18–21, The Venetian Expo, Las Vegas).
 Swipe through the agenda, save the sessions you want, then add all of them to your calendar in one go.
@@ -17,7 +17,7 @@ Live: [https://m2020.pages.dev](https://m2020.pages.dev). It is not affiliated w
 - **Saved list**: grouped by day, with Remove (and Undo).
 - **Add everything to your calendar at once** (see below). Every event is marked *free* and *tentative*, so it never
   blocks your work calendar, and there are no reminders.
-- In-app toasts and a confirm dialog (no browser pop-ups). Respects reduced motion. Dark theme.
+- In-app toasts and a confirm dialog (no browser pop-ups). Respects reduced motion. Light and dark theme (follows your device, or pick one in the menu).
 
 ## Adding sessions to a calendar
 

@@ -805,3 +805,254 @@ html.filters-scroll-lock body {
     transform: none;
   }
 }
+
+/* ==========================================================================================
+   Day identity: SUN / MON / TUE / WED
+   Each conference day has its own colour, used wherever the day shows up: the session card (badge, top
+   bar, header wash), the saved list (sticky day banners + row markers) and the day filters (sheet tiles +
+   active-filter chips). app.js sets data-day="sun|mon|tue|wed" (computed from the date) on the card, the
+   badge and the saved list; filters.js sets it on the day chips. The day is always spelled out in text as
+   well: colour is a second channel, never the only one.
+
+   Palette: styles.css defines, per theme, --day-{sun,mon,tue,wed} (vivid solid), --day-*-ink (text on the
+   solid, AA), --day-*-soft (tinted background) and --day-*-text (coloured text, AA on the surface and on
+   the tint). [data-day] turns them into four local aliases that every rule below consumes; the fallbacks
+   only apply if a token is missing.
+     --dy       solid fill / stripe / bar        --dy-ink   text + icons on --dy
+     --dy-soft  tinted background                --dy-text  day-coloured text on the surface or on --dy-soft
+   ========================================================================================== */
+
+[data-day] {
+  /* neutral: a date outside Sun-Wed (or no data-day at all) never gets a loud colour */
+  --dy: var(--color-surface-3, #25252B);
+  --dy-ink: var(--color-text, #F5F5F7);
+  --dy-soft: var(--color-surface-2, #1A1A1F);
+  --dy-text: var(--color-text, #F5F5F7);
+}
+
+/* fallbacks = the dark-theme values from styles.css */
+[data-day="sun"] { --dy: var(--day-sun, #FFC81F); --dy-ink: var(--day-sun-ink, #09090B); --dy-soft: var(--day-sun-soft, #372E16); --dy-text: var(--day-sun-text, #FFC81F); }
+[data-day="mon"] { --dy: var(--day-mon, #33CFF0); --dy-ink: var(--day-mon-ink, #09090B); --dy-soft: var(--day-mon-soft, #162F37); --dy-text: var(--day-mon-text, #33CFF0); }
+[data-day="tue"] { --dy: var(--day-tue, #8F8CFF); --dy-ink: var(--day-tue-ink, #09090B); --dy-soft: var(--day-tue-soft, #25253A); --dy-text: var(--day-tue-text, #8F8CFF); }
+[data-day="wed"] { --dy: var(--day-wed, #E37AFF); --dy-ink: var(--day-wed-ink, #09090B); --dy-soft: var(--day-wed-soft, #33223A); --dy-text: var(--day-wed-text, #E37AFF); }
+
+/* ---------- the badge: solid pill, "SUN" big and heavy + "Oct 18" lighter ---------- */
+.day-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  gap: 7px;
+  padding: 7px 14px 7px 12px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--dy);
+  color: var(--dy-ink);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.day-badge__dow {
+  font-size: 20px;
+  font-weight: var(--font-weight-heavy, 800);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.day-badge__date {
+  font-size: var(--font-size-sm, 14px);
+  font-weight: var(--font-weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+}
+
+.day-badge--lg {
+  gap: 9px;
+  padding: 8px 18px 8px 14px;
+}
+
+.day-badge--lg .day-badge__dow {
+  font-size: 22px;
+}
+
+.day-badge--lg .day-badge__date {
+  font-size: 15px;
+}
+
+/* no usable date: a quiet neutral pill, never a day colour */
+.day-badge--tba {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
+.day-badge--tba .day-badge__date {
+  font-size: var(--font-size-sm, 14px);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+/* ---------- session card: top bar + header wash + badge row ---------- */
+.card-day-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 6px;
+  background: var(--dy, transparent);
+  pointer-events: none;
+}
+
+.session-card[data-day] .card-head {
+  background: linear-gradient(180deg, var(--dy-soft) 0%, transparent 100%);
+}
+
+/* the badge is taller than the old one-line eyebrow; a long session type wraps under it instead of overflowing */
+.session-card .card-eyebrow {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+  min-height: 34px;
+}
+
+.session-card .card-title {
+  margin-top: var(--space-3);
+}
+
+@media (max-height: 700px) {
+  .session-card .card-title {
+    margin-top: var(--space-2);
+  }
+
+  .session-card .card-eyebrow {
+    min-height: 30px;
+  }
+
+  .session-card .day-badge {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .session-card .day-badge__dow {
+    font-size: 18px;
+  }
+}
+
+/* ---------- saved list: sticky day banners + a colour marker on every row ---------- */
+/* keep a focused row clear of the sticky banner (keyboard users tabbing down the list) */
+#overlay-body {
+  scroll-padding-top: 76px;
+}
+
+.day-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 5px var(--space-4) 5px 5px;
+  border-radius: var(--radius-pill, 999px);
+  /* the sticky head already paints --color-surface; the tint goes on top and stays opaque if --dy-soft is translucent */
+  background: linear-gradient(var(--dy-soft, transparent), var(--dy-soft, transparent)), var(--color-surface);
+}
+
+.day-banner__count {
+  font-size: var(--text-small, 13px);
+  font-weight: var(--font-weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.saved-row {
+  position: relative;
+}
+
+.saved-row[data-day] {
+  padding-left: var(--space-4);
+}
+
+.saved-row[data-day]::before {
+  content: "";
+  position: absolute;
+  top: var(--space-3);
+  bottom: var(--space-3);
+  left: 0;
+  width: 4px;
+  border-radius: 4px;
+  background: var(--dy);
+}
+
+/* ---------- filter sheet: day tiles ---------- */
+/* unselected = tinted tile with a day-coloured top stripe; selected = solid day colour with ink text */
+.filters-panel .fp-day[data-day] {
+  position: relative;
+  overflow: hidden;
+  padding-top: calc(var(--space-2) + 3px);
+  background: var(--dy-soft);
+  border-color: color-mix(in srgb, var(--dy) 40%, transparent);
+}
+
+.filters-panel .fp-day[data-day]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  background: var(--dy);
+}
+
+.filters-panel .fp-day[data-day] .fp-day-label {
+  font-size: 13px;
+  font-weight: var(--font-weight-heavy, 800);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.filters-panel .fp-day[data-day]:not([aria-checked="true"]) .fp-day-label {
+  color: var(--dy-text);
+}
+
+.filters-panel .fp-day[data-day][aria-checked="true"] {
+  background: var(--dy);
+  border-color: var(--dy);
+  color: var(--dy-ink);
+}
+
+.filters-panel .fp-day[data-day][aria-checked="true"] .fp-count {
+  color: var(--dy-ink);
+}
+
+@media (max-width: 359.98px) {
+  .filters-panel .fp-day[data-day] {
+    padding-right: 2px;
+    padding-left: 2px;
+  }
+}
+
+@media (hover: hover) {
+  .filters-panel .fp-day[data-day]:hover:not([aria-disabled="true"]):not([aria-checked="true"]) {
+    background: color-mix(in srgb, var(--dy) 22%, var(--dy-soft));
+    border-color: var(--dy);
+  }
+}
+
+/* ---------- active-filter strip: a selected day is a solid chip in its colour ---------- */
+.filters-summary .fs-chip[data-day] {
+  border-color: var(--dy);
+  background: var(--dy);
+  color: var(--dy-ink);
+}
+
+.filters-summary .fs-chip[data-day] .fs-chip-label {
+  font-weight: var(--font-weight-heavy, 800);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.filters-summary .fs-chip[data-day]:focus-visible {
+  outline-color: var(--dy-ink);
+}
+
+/* Windows high contrast drops fills: keep the badge and banner visible as shapes */
+@media (forced-colors: active) {
+  .day-badge,
+  .day-banner {
+    border: 1px solid CanvasText;
+  }
+}

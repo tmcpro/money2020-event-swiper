@@ -13,6 +13,17 @@
  *   Filters.reset()                    clears all filters, persists, re-renders, calls onChange
  *   Filters.refresh()                  (extension) recompute remaining counts after swipes/undo/reset
  *   Filters.activeCount() -> number    (extension) number of active facets (search counts as one)
+ *   Filters.setState(partial) -> stateCopy   (onboarding) merges the facets present in `partial` (q, days, venues,
+ *                                      types, themes, tags; each sanitised, unknown values dropped once sessions
+ *                                      are loaded), persists, re-renders and calls onChange like any other change
+ *   Filters.countFor(stateLike) -> number    (onboarding) unswiped sessions that would match `stateLike` (a full
+ *                                      state: missing facets mean "no restriction"); never changes anything
+ *   Filters.options() -> { loaded, total, remaining, days, venues, types, themes, tags }   (onboarding) every
+ *                                      facet's options as { facet, value, label, total, remaining } (days also get
+ *                                      key 'sun'|'mon'|... and long 'Sun, Oct 18'); empty arrays until sessions load
+ *   Filters.onSessions(cb, {immediate}?) -> off()   cb({ total }) after every setSessions (also dispatched as the
+ *                                      window event 'm2020:sessions' with detail { total })
+ *   Day chips (filter sheet + summary strip) carry data-day="sun|mon|tue|wed" (computed from the date).
  *
  * Semantics: AND across facets, OR within a facet. The search query is split on whitespace and every
  * word must appear (case- and accent-insensitive) in the session's title, speaker names, companies,
@@ -307,6 +318,17 @@
     return s || dayLabel(iso);
   }
 
+  // "2026-10-18" -> 'sun', "2026-10-19" -> 'mon', ... Computed from the date (styling hook: data-day).
+  function dayKeyOf(iso) {
+    const c = core();
+    let wd = c && typeof c.weekdayShort === 'function' ? c.weekdayShort(iso) : '';
+    if (!wd && /^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) {
+      const d = new Date(Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))));
+      wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()] || '';
+    }
+    return wd ? wd.toLowerCase() : '';
+  }
+
   function venueChipLabel(venue) {
     const V = venuesApi();
     if (!V || typeof V.resolve !== 'function') return venue;
@@ -509,7 +531,7 @@
         const label = optionLabel(f, v);
         const c = core();
         const short = f === 'types' && c && c.formatShort ? c.formatShort(v) : label;
-        items.push({ facet: f, value: v, label, short, kind: FACET_LABELS[f] });
+        items.push({ facet: f, value: v, label, short, kind: FACET_LABELS[f], dayKey: f === 'days' ? dayKeyOf(v) : '' });
       });
     });
     return items;
@@ -586,7 +608,7 @@
     }
 
     const chips = shown.map((it, i) => `
-      <button type="button" class="fs-chip" data-fs-remove="${i}" title="${escapeHtml(`${it.kind}: ${it.label}`)}"
+      <button type="button" class="fs-chip" data-fs-remove="${i}"${it.dayKey ? ` data-day="${escapeHtml(it.dayKey)}"` : ''} title="${escapeHtml(`${it.kind}: ${it.label}`)}"
         aria-label="${escapeHtml(`Remove filter ${it.kind}: ${it.label}`)}">
         <span class="fs-chip-label">${escapeHtml(it.short || it.label)}</span>${ICONS.remove}
       </button>`).join('');
@@ -669,7 +691,8 @@
   }
 
   function dayChipHtml(o) {
-    return `<button type="button" class="fp-day" role="checkbox" aria-checked="false" data-facet="days" data-idx="${o.idx}">
+    const dk = dayKeyOf(o.value);
+    return `<button type="button" class="fp-day" role="checkbox" aria-checked="false" data-facet="days" data-idx="${o.idx}"${dk ? ` data-day="${escapeHtml(dk)}"` : ''}>
       <span class="fp-day-label">${escapeHtml(o.label)}</span><span class="fp-count" aria-hidden="true">${o.total}</span>
     </button>`;
   }
@@ -1320,6 +1343,122 @@
         rootEl.focus({ preventScroll: true });
       }
     }
+    notifySessions();
+  }
+
+  // ---- public: onboarding helpers (additive; nothing above depends on them) -----------------------
+  const sessionListeners = [];
+
+  // Tell interested modules (onboarding) that the schedule arrived or changed. Listener errors never
+  // reach app.js; the window event covers code that loads before or without filters.js.
+  function notifySessions() {
+    const detail = { total: allSessions.length };
+    sessionListeners.slice().forEach((cb) => {
+      try {
+        cb(detail);
+      } catch (error) {
+        console.warn('Filters onSessions handler failed.', error);
+      }
+    });
+    try {
+      if (typeof root.CustomEvent === 'function' && typeof root.dispatchEvent === 'function') {
+        root.dispatchEvent(new root.CustomEvent('m2020:sessions', { detail }));
+      }
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  function onSessions(cb, opts) {
+    if (typeof cb !== 'function') return function noop() {};
+    sessionListeners.push(cb);
+    if (opts && opts.immediate && allSessions.length) {
+      try {
+        cb({ total: allSessions.length });
+      } catch (error) {
+        console.warn('Filters onSessions handler failed.', error);
+      }
+    }
+    return function off() {
+      const i = sessionListeners.indexOf(cb);
+      if (i !== -1) sessionListeners.splice(i, 1);
+    };
+  }
+
+  // Candidate state = current state with the facets present in `partial` replaced (each sanitised).
+  function mergePartial(partial) {
+    const next = copyState();
+    if (!partial || typeof partial !== 'object') return next;
+    if (Object.prototype.hasOwnProperty.call(partial, 'q')) {
+      next.q = typeof partial.q === 'string' ? partial.q.slice(0, MAX_QUERY_LENGTH) : '';
+    }
+    FACETS.forEach((k) => {
+      if (Object.prototype.hasOwnProperty.call(partial, k)) next[k] = sanitize({ [k]: partial[k] })[k];
+    });
+    return next;
+  }
+
+  // Once the schedule is loaded, values that are not in it are dropped (same rule as pruneState()).
+  function pruneCopy(st) {
+    if (!allSessions.length) return st;
+    FACETS.forEach((f) => {
+      st[f] = st[f].filter((v) => !!model.index[f][v]);
+    });
+    return st;
+  }
+
+  function setState(partial) {
+    const next = pruneCopy(mergePartial(partial));
+    if (next.q !== state.q) clearSearchTimer();
+    state = next;
+    if (isOpen && rootEl) {
+      const input = rootEl.querySelector('#filters-q');
+      if (input && input.value !== state.q) input.value = state.q;
+      rerenderTopics(); // selected topics beyond the collapsed list must show up
+    }
+    changed();
+    return copyState();
+  }
+
+  // Unswiped sessions that would match `stateLike` (missing facets = no restriction). Read-only.
+  function countFor(stateLike) {
+    const st = pruneCopy(sanitize(stateLike));
+    const pred = compile(st, null);
+    const processed = processedSet();
+    let n = 0;
+    allSessions.forEach((s) => {
+      if (!processed.has(idOf(s)) && pred(s)) n += 1;
+    });
+    return n;
+  }
+
+  function options() {
+    const processed = processedSet();
+    const remaining = allSessions.filter((s) => !processed.has(idOf(s)));
+    const remainingBy = {};
+    FACETS.forEach((f) => { remainingBy[f] = {}; });
+    remaining.forEach((s) => {
+      FACETS.forEach((f) => {
+        const seen = new Set();
+        sessionValues(s, f).forEach((v) => {
+          if (typeof v !== 'string' || !v || seen.has(v)) return;
+          seen.add(v);
+          remainingBy[f][v] = (remainingBy[f][v] || 0) + 1;
+        });
+      });
+    });
+    const out = { loaded: allSessions.length > 0, total: allSessions.length, remaining: remaining.length };
+    FACETS.forEach((f) => {
+      out[f] = (model.options[f] || []).map((o) => {
+        const item = { facet: f, value: o.value, label: o.label, total: o.total, remaining: remainingBy[f][o.value] || 0 };
+        if (f === 'days') {
+          item.key = dayKeyOf(o.value);
+          item.long = dayLongLabel(o.value);
+        }
+        return item;
+      });
+    });
+    return out;
   }
 
   function refresh() {
@@ -1424,6 +1563,10 @@
     close,
     reset,
     refresh,
+    setState,
+    countFor,
+    options,
+    onSessions,
     isOpen: () => isOpen
   };
 }(typeof window !== 'undefined' ? window : this));
