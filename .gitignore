@@ -33,3 +33,6 @@ node_modules/
 # Environment files
 .env
 .env.local
+
+# Wrangler (Cloudflare Pages local dev)
+.wrangler/

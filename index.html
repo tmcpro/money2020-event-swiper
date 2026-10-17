@@ -2,867 +2,221 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>M2020 Events</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html, body {
-      overflow-x: hidden;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: #000000;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-    }
-
-    .header {
-      color: white;
-      text-align: center;
-      margin-bottom: 12px;
-      position: relative;
-      min-height: 44px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.5s ease;
-    }
-
-    .header h1 {
-      font-size: clamp(1.3em, 4vw, 1.5em);
-      margin-bottom: 6px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-      transition: opacity 0.5s ease, transform 0.5s ease;
-    }
-
-    .header.loaded h1 {
-      opacity: 0;
-      transform: translateY(-10px);
-      position: absolute;
-      pointer-events: none;
-    }
-
-    .counter {
-      background: #00E5CC;
-      padding: 6px 14px;
-      border-radius: 12px;
-      font-size: clamp(0.75em, 2vw, 0.85em);
-      font-weight: 700;
-      display: inline-block;
-      border: none;
-      color: #000000;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity 0.5s ease 0.3s, transform 0.5s ease 0.3s;
-    }
-
-    .header.loaded .counter {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .counter-number {
-      font-weight: 700;
-    }
-
-    .card-container {
-      position: relative;
-      width: 100%;
-      max-width: 500px;
-      height: 650px;
-      perspective: 1000px;
-    }
-
-    .card {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-      cursor: grab;
-      user-select: none;
-      transition: transform 0.3s ease;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .card:active {
-      cursor: grabbing;
-    }
-
-    .card.swiping-left {
-      transform: translateX(-100px) rotate(-10deg);
-    }
-
-    .card.swiping-right {
-      transform: translateX(100px) rotate(10deg);
-    }
-
-    .card-content {
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    .card-header {
-      padding: 30px 30px 10px;
-      background: linear-gradient(to bottom, #ffffff 0%, #f8f9ff 100%);
-      border-bottom: 1px solid #e8eaf6;
-    }
-
-    .event-title {
-      font-size: clamp(1.35em, 3.5vw, 1.6em);
-      font-weight: 800;
-      color: #000000;
-      margin-bottom: clamp(12px, 2.5vw, 16px);
-      line-height: 1.25;
-      letter-spacing: -0.03em;
-    }
-
-    .event-title::before {
-      content: "/";
-      color: #FF006B;
-      margin-right: 6px;
-      font-weight: 300;
-    }
-
-    .event-meta {
-      display: flex;
-      flex-direction: column;
-      gap: clamp(8px, 1.5vw, 10px);
-      color: #4a4a68;
-      font-size: clamp(0.88em, 2vw, 0.95em);
-    }
-
-    .meta-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 500;
-    }
-
-    .meta-item.primary {
-      font-size: 1.05em;
-      color: #2d2d44;
-      font-weight: 600;
-    }
-
-    .meta-item.datetime {
-      font-size: clamp(1em, 2.2vw, 1.1em);
-      color: #1a1a2e;
-      font-weight: 600;
-    }
-
-    .meta-icon {
-      font-size: 1.3em;
-      width: clamp(18px, 4vw, 24px);
-      text-align: center;
-      flex-shrink: 0;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 4px 10px;
-      background: #FF006B;
-      color: white;
-      border-radius: 14px;
-      font-size: clamp(0.75em, 1.8vw, 0.82em);
-      font-weight: 700;
-      margin-right: 4px;
-      margin-bottom: 4px;
-      white-space: nowrap;
-      line-height: 1.3;
-    }
-
-    .badge.secondary {
-      background: #00E5CC;
-      color: #000000;
-      font-weight: 700;
-    }
-
-    .event-description {
-      padding: 10px clamp(20px, 4vw, 30px);
-      color: #4a4a68;
-      line-height: 1.6;
-      font-size: clamp(0.88em, 2vw, 0.92em);
-      overflow-y: auto;
-      overflow-x: hidden;
-      flex: 1;
-      position: relative;
-      min-height: 100px;
-      max-height: 250px;
-      -webkit-overflow-scrolling: touch;
-      touch-action: pan-y;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-
-    .event-description::-webkit-scrollbar {
-      display: none;
-    }
-
-    .speakers-section {
-      padding: 10px clamp(20px, 4vw, 30px) clamp(16px, 3vw, 20px);
-      background: #fafbff;
-      border-top: 1px solid #e8eaf6;
-      flex-shrink: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
-      max-height: 200px;
-      -webkit-overflow-scrolling: touch;
-      touch-action: pan-y;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-
-    .speakers-section::-webkit-scrollbar {
-      display: none;
-    }
-
-    .speakers-title {
-      font-size: clamp(0.72em, 1.6vw, 0.8em);
-      font-weight: 700;
-      color: #6a6a82;
-      margin-bottom: clamp(10px, 2vw, 12px);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    .speaker {
-      margin-bottom: clamp(8px, 1.8vw, 10px);
-      padding: 0;
-      background: transparent;
-      border-radius: 0;
-    }
-
-    .speaker:last-child {
-      margin-bottom: 0;
-    }
-
-    .speaker-name {
-      font-weight: 500;
-      color: #6a6a82;
-      font-size: clamp(0.75em, 1.7vw, 0.8em);
-      line-height: 1.3;
-    }
-
-    .speaker-role {
-      color: #1a1a2e;
-      font-size: clamp(0.8em, 1.8vw, 0.85em);
-      font-weight: 600;
-      margin-top: 1px;
-      line-height: 1.35;
-    }
-
-    .speaker-type {
-      color: #8a8a9a;
-      font-weight: 500;
-      font-size: 0.95em;
-    }
-
-    .buttons {
-      display: flex;
-      justify-content: center;
-      gap: 30px;
-      margin-top: 30px;
-    }
-
-    .btn {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      border: none;
-      cursor: pointer;
-      font-size: 2em;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.2s ease;
-      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-    }
-
-    .btn:hover {
-      transform: scale(1.1);
-    }
-
-    .btn:active {
-      transform: scale(0.95);
-    }
-
-    .btn-dislike {
-      background: #333333;
-      color: white;
-    }
-
-    .btn-like {
-      background: #FF006B;
-      color: white;
-    }
-
-    .controls {
-      margin-top: 30px;
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-
-    .control-btn {
-      padding: 12px 24px;
-      background: #00E5CC;
-      color: #000000;
-      border: none;
-      border-radius: 25px;
-      cursor: pointer;
-      font-weight: 700;
-      transition: all 0.2s ease;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
-    }
-
-    .control-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(0, 229, 204, 0.4);
-      background: #00FCD9;
-    }
-
-    .no-more-events {
-      display: none;
-      text-align: center;
-      color: white;
-      font-size: 1.5em;
-      padding: 40px;
-    }
-
-    .loading-spinner {
-      display: none;
-      width: 60px;
-      height: 60px;
-      border: 6px solid rgba(255, 255, 255, 0.3);
-      border-top: 6px solid white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 100px auto;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .card-container.loading .loading-spinner {
-      display: block;
-    }
-
-    .card-container.loading .card {
-      display: none;
-    }
-
-    .card-container.loading .no-more-events {
-      display: none !important;
-    }
-
-    .btn:disabled,
-    .control-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      pointer-events: none;
-    }
-
-    .undo-container {
-      margin-top: 15px;
-      text-align: center;
-    }
-
-    .undo-btn {
-      padding: 8px 20px;
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 20px;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 0.9em;
-      transition: all 0.2s ease;
-      display: none;
-    }
-
-    .undo-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: #00E5CC;
-      transform: scale(1.05);
-    }
-
-    .undo-btn.visible {
-      display: inline-block;
-    }
-
-    .hint {
-      color: rgba(255, 255, 255, 0.8);
-      text-align: center;
-      margin-top: 20px;
-      font-size: 0.9em;
-    }
-
-    .overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0);
-      backdrop-filter: blur(0px);
-      -webkit-backdrop-filter: blur(0px);
-      z-index: 1000;
-      display: none;
-      pointer-events: none;
-      transition: background 0.4s cubic-bezier(0.32, 0.72, 0, 1),
-                  backdrop-filter 0.4s cubic-bezier(0.32, 0.72, 0, 1);
-    }
-
-    .overlay.visible {
-      display: flex;
-      pointer-events: auto;
-      background: rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-    }
-
-    .overlay-content {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: white;
-      border-radius: 20px 20px 0 0;
-      max-height: 80vh;
-      display: flex;
-      flex-direction: column;
-      transform: translateY(100%);
-      transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
-      box-shadow: 0 -5px 30px rgba(0, 0, 0, 0.3);
-      will-change: transform;
-    }
-
-    .overlay.visible .overlay-content {
-      transform: translateY(0);
-    }
-
-    .overlay-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 24px 24px 16px;
-      border-bottom: 1px solid #e8eaf6;
-      flex-shrink: 0;
-    }
-
-    .overlay-header h2 {
-      margin: 0;
-      font-size: 1.4em;
-      color: #000000;
-      font-weight: 800;
-    }
-
-    .overlay-header h2::before {
-      content: "/";
-      color: #FF006B;
-      margin-right: 6px;
-      font-weight: 300;
-    }
-
-    .close-btn {
-      background: #f0f0f5;
-      border: none;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      cursor: pointer;
-      font-size: 1.2em;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #4a4a68;
-      transition: all 0.2s ease;
-    }
-
-    .close-btn:hover {
-      background: #e0e0ea;
-      transform: scale(1.1);
-    }
-
-    .overlay-body {
-      overflow-y: auto;
-      padding: 16px 24px 24px;
-      flex: 1;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-
-    .overlay-body::-webkit-scrollbar {
-      display: none;
-    }
-
-    .selected-event-card {
-      background: #fafbff;
-      border: 1px solid #e8eaf6;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
-      transition: all 0.2s ease;
-    }
-
-    .selected-event-card:hover {
-      background: #f5f6ff;
-      border-color: #667eea;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
-    }
-
-    .selected-event-card:last-child {
-      margin-bottom: 0;
-    }
-
-    .selected-event-title {
-      font-size: 1.1em;
-      font-weight: 800;
-      color: #000000;
-      margin-bottom: 8px;
-      line-height: 1.3;
-    }
-
-    .selected-event-title::before {
-      content: "/";
-      color: #FF006B;
-      margin-right: 4px;
-      font-weight: 300;
-      font-size: 0.95em;
-    }
-
-    .selected-event-meta {
-      font-size: 0.9em;
-      color: #4a4a68;
-      line-height: 1.5;
-    }
-
-    .selected-event-meta-item {
-      margin-bottom: 4px;
-    }
-
-    .selected-event-meta-item:last-child {
-      margin-bottom: 0;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #8a8a9a;
-    }
-
-    .empty-state-icon {
-      font-size: 3em;
-      margin-bottom: 16px;
-    }
-
-    .empty-state-text {
-      font-size: 1.1em;
-      font-weight: 500;
-    }
-
-    .about-content {
-      padding: 20px 24px 24px;
-    }
-
-    .about-content p {
-      color: #2d2d44;
-      line-height: 1.7;
-      margin-bottom: 16px;
-      font-size: 1em;
-    }
-
-    .about-content p:last-child {
-      margin-bottom: 0;
-    }
-
-    .about-content strong {
-      color: #FF006B;
-      font-weight: 700;
-    }
-
-    .author-link {
-      color: #FF006B;
-      font-weight: 700;
-      text-decoration: none;
-      border-bottom: 2px solid transparent;
-      transition: border-color 0.2s ease;
-    }
-
-    .author-link:hover {
-      border-bottom-color: #FF006B;
-    }
-
-    .export-content {
-      padding: 20px 24px 24px;
-    }
-
-    .export-intro {
-      color: #2d2d44;
-      font-size: 1.05em;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-
-    .export-instructions h3 {
-      color: #1a1a2e;
-      font-size: 1.1em;
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
-
-    .export-instructions ul {
-      list-style: none;
-      padding: 0;
-      margin: 0 0 24px 0;
-    }
-
-    .export-instructions li {
-      padding: 12px 0;
-      border-bottom: 1px solid #e8eaf6;
-      color: #2d2d44;
-    }
-
-    .export-instructions li:last-child {
-      border-bottom: none;
-    }
-
-    .export-instructions strong {
-      color: #1a1a2e;
-      font-weight: 700;
-      margin-right: 8px;
-    }
-
-    .export-instructions a {
-      color: #667eea;
-      text-decoration: none;
-      border-bottom: 1px solid transparent;
-      transition: border-color 0.2s ease;
-    }
-
-    .export-instructions a:hover {
-      border-bottom-color: #667eea;
-    }
-
-    .export-cta {
-      text-align: center;
-      padding-top: 16px;
-      border-top: 2px solid #e8eaf6;
-    }
-
-    .export-download-btn {
-      background: #FF006B;
-      color: white;
-      border: none;
-      padding: 16px 48px;
-      border-radius: 30px;
-      font-size: 1.1em;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(255, 0, 107, 0.3);
-      margin-bottom: 12px;
-    }
-
-    .export-download-btn:hover {
-      background: #E6005F;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(255, 0, 107, 0.4);
-    }
-
-    .export-download-btn:active {
-      transform: translateY(0);
-    }
-
-    .export-count {
-      color: #6a6a82;
-      font-size: 0.9em;
-      margin: 0;
-    }
-
-    @media (max-width: 600px) {
-      body {
-        padding: 16px;
-      }
-
-      .header {
-        margin-bottom: 10px;
-        min-height: 38px;
-      }
-
-      .card-container {
-        height: 600px;
-      }
-
-      .card-header {
-        padding: clamp(18px, 3.5vw, 20px) 20px 16px;
-      }
-
-      .btn {
-        width: 60px;
-        height: 60px;
-        font-size: 1.5em;
-      }
-
-      .buttons {
-        margin-top: 20px;
-        gap: 25px;
-      }
-
-      .hint {
-        font-size: clamp(0.8em, 2vw, 0.85em);
-        margin-top: 16px;
-      }
-
-      .controls {
-        margin-top: 20px;
-        gap: 10px;
-      }
-
-      .control-btn {
-        padding: 10px 18px;
-        font-size: clamp(0.85em, 2vw, 0.9em);
-      }
-
-      .overlay-content {
-        max-height: 85vh;
-      }
-
-      .overlay-header {
-        padding: 20px 20px 14px;
-      }
-
-      .overlay-header h2 {
-        font-size: 1.25em;
-      }
-
-      .overlay-body {
-        padding: 12px 20px 20px;
-      }
-
-      .selected-event-card {
-        padding: 14px;
-      }
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0E14">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Swipe through the Money20/20 USA 2026 agenda, save the sessions you want and add them all to your calendar in one tap. Unofficial.">
+  <title>M2020 Picks — session swiper (unofficial)</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230B0E14'/%3E%3Crect x='7' y='8.5' width='18' height='16.5' rx='3' fill='none' stroke='%238FA3FF' stroke-width='2.5'/%3E%3Cpath d='M7 14h18M12 6v4.5M20 6v4.5' fill='none' stroke='%238FA3FF' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="filters.css">
+  <link rel="stylesheet" href="export.css">
+  <link rel="stylesheet" href="toast.css">
 </head>
 <body>
-  <div class="header">
-    <h1>📅 M2020 Events</h1>
-    <div class="counter">
-      <span class="counter-number" id="selected-count">0</span> saved · <span class="counter-number" id="remaining-count">0</span> left
+  <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-logo" viewBox="0 0 24 24"><rect x="8.5" y="2.5" width="11.5" height="15.5" rx="2.5" transform="rotate(12 14.25 10.25)" opacity="0.5"/><rect x="4" y="5.5" width="11.5" height="15.5" rx="2.5"/><path d="M7.4 13.4l2 2 3.4-3.6"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 3.5h10A1.5 1.5 0 0 1 18.5 5v15.5L12 16.5l-6.5 4V5A1.5 1.5 0 0 1 7 3.5z"/></symbol>
+    <symbol id="i-bookmark-plus" viewBox="0 0 24 24"><path d="M7 3.5h10A1.5 1.5 0 0 1 18.5 5v15.5L12 16.5l-6.5 4V5A1.5 1.5 0 0 1 7 3.5z"/><path d="M12 7.5v6M9 10.5h6"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.8" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4.5L3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2-6-2z"/><path d="M9 4.5v13M15 6.5v13"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7 5.5-5.7"/></symbol>
+    <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M8.2 6.3A6 6 0 0 1 17.7 10h.3a4 4 0 0 1 2.4 7.2"/><path d="M17 18H7a5 5 0 0 1-1.6-9.74"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.1"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12.5A1.5 1.5 0 0 0 8 21h8a1.5 1.5 0 0 0 1.5-1.5L18.5 7M9 7V4.5h6V7"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></symbol>
+    <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v5h5"/></symbol>
+  </svg>
+
+  <div class="app" id="app">
+    <header class="app-header">
+      <div class="brand">
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-logo"></use></svg>
+        <span>M2020 Picks</span>
+      </div>
+      <nav class="header-actions" aria-label="App">
+        <button type="button" class="hdr-btn" id="open-filters" aria-haspopup="dialog" aria-controls="filters-overlay" aria-expanded="false" data-active="false" aria-label="Filters" title="Filters (F)">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-filter"></use></svg>
+        </button>
+        <button type="button" class="hdr-btn" id="view-selected" data-app-action="saved" aria-haspopup="dialog" aria-controls="selected-overlay" aria-label="Saved sessions, 0" title="Saved (S)">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-bookmark"></use></svg>
+          <span class="hdr-badge hdr-badge--like" id="selected-count" aria-hidden="true" hidden>0</span>
+        </button>
+        <button type="button" class="hdr-btn" id="more-btn" data-app-action="more" aria-haspopup="dialog" aria-controls="more-overlay" aria-label="More options" title="More">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-more"></use></svg>
+        </button>
+      </nav>
+    </header>
+
+    <div class="progress" id="progress" role="progressbar" aria-label="Sessions reviewed" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+      <div class="progress-fill" id="progress-fill"></div>
     </div>
+
+    <main class="main" id="main">
+      <div class="status-row is-loading" id="status-row">
+        <p class="status-text">
+          <span class="status-loading">Loading sessions…</span>
+          <span class="status-counts"><b id="remaining-count">0</b> <span id="remaining-label">left</span><span id="status-saved"> · <b id="status-saved-count">0</b> saved</span></span>
+        </p>
+        <div class="filter-summary" id="filter-summary-root" hidden></div>
+      </div>
+
+      <div class="deck loading" id="card-container" aria-busy="true">
+        <div class="skeleton" aria-hidden="true">
+          <div class="sk-line sk-line--eyebrow"></div>
+          <div class="sk-line sk-line--title"></div>
+          <div class="sk-line sk-line--title2"></div>
+          <div class="sk-line sk-line--meta"></div>
+          <div class="sk-line sk-line--meta2"></div>
+          <div class="sk-line sk-line--p"></div>
+          <div class="sk-line sk-line--p2"></div>
+          <div class="sk-line sk-line--p"></div>
+          <div class="sk-line sk-line--p3"></div>
+        </div>
+        <div class="deck-state" id="no-more" hidden></div>
+      </div>
+
+      <div class="dock">
+        <div class="hint-strip" id="hint-strip" hidden>
+          <p><span aria-hidden="true">→</span> Swipe right to save · <span aria-hidden="true">←</span> left to skip<span class="hint-keys"> (or use ← → keys)</span></p>
+          <button type="button" class="ui-btn ui-btn--text" data-app-action="dismiss-hint">Got it</button>
+        </div>
+        <div class="action-bar" id="action-bar" role="group" aria-label="Session actions">
+          <button type="button" class="act-btn act-btn--undo" id="undo-btn" data-app-action="undo" aria-label="Undo" aria-disabled="true" title="Undo (Z)">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-undo"></use></svg>
+          </button>
+          <div class="action-pair">
+            <button type="button" class="act-btn act-btn--skip" id="btn-dislike" aria-label="Skip session" title="Skip (←)" disabled>
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"></use></svg>
+            </button>
+            <button type="button" class="act-btn act-btn--save" id="btn-like" aria-label="Save session" title="Save (→)" disabled>
+              <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-bookmark-plus"></use></svg>
+            </button>
+          </div>
+          <span class="action-spacer" aria-hidden="true"></span>
+        </div>
+      </div>
+    </main>
   </div>
 
-  <div class="card-container" id="card-container">
-    <div class="loading-spinner"></div>
-    <div class="no-more-events" id="no-more">
-      🎉 All done!<br />
-      <button class="control-btn" id="export-end">Export to Calendar</button>
-    </div>
-  </div>
-
-  <div class="buttons">
-    <button class="btn btn-dislike" id="btn-dislike" title="Press Left Arrow">✕</button>
-    <button class="btn btn-like" id="btn-like" title="Press Right Arrow">♥</button>
-  </div>
-
-  <div class="undo-container">
-    <button class="undo-btn" id="undo-btn">↶ Undo</button>
-  </div>
-
-  <div class="hint">
-    👈 Swipe left to skip | Swipe right to save 👉<br>
-    Use arrow keys on desktop
-  </div>
-
-  <div class="controls">
-    <button class="control-btn" id="view-selected">View Selected</button>
-    <button class="control-btn" id="reset">Reset</button>
-    <button class="control-btn" id="export">Export to Calendar</button>
-    <button class="control-btn" id="about">About</button>
-  </div>
-
+  <!-- Saved sessions: bottom sheet (mobile) / right panel (desktop) -->
   <div class="overlay" id="selected-overlay">
-    <div class="overlay-content">
+    <div class="overlay-content sheet" role="dialog" aria-modal="true" aria-labelledby="saved-title" tabindex="-1">
       <div class="overlay-header">
-        <h2>Selected Events</h2>
-        <button class="close-btn" id="close-overlay">✕</button>
+        <h2 id="saved-title">Saved</h2>
+        <button type="button" class="close-btn" id="close-overlay" data-app-action="close-saved" aria-label="Close saved sessions">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"></use></svg>
+        </button>
       </div>
-      <div class="overlay-body" id="overlay-body">
-        <!-- Selected events will be rendered here -->
+      <div class="overlay-body" id="overlay-body"></div>
+      <div class="overlay-footer" id="saved-footer" hidden>
+        <button type="button" class="ui-btn ui-btn--primary ui-btn--block" id="saved-export" data-app-action="export">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-calendar"></use></svg>
+          <span id="saved-export-label">Add to calendar</span>
+        </button>
+        <p class="footnote">Shows as free in your calendar</p>
       </div>
     </div>
   </div>
 
-  <div class="overlay" id="about-overlay">
-    <div class="overlay-content">
+  <!-- About: bottom sheet (mobile) / centred dialog (desktop) -->
+  <div class="overlay overlay--dialog" id="about-overlay">
+    <div class="overlay-content sheet" role="dialog" aria-modal="true" aria-labelledby="about-title" tabindex="-1">
       <div class="overlay-header">
-        <h2>About</h2>
-        <button class="close-btn" id="close-about">✕</button>
+        <h2 id="about-title">About</h2>
+        <button type="button" class="close-btn" id="close-about" data-app-action="close-about" aria-label="Close about">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"></use></svg>
+        </button>
       </div>
       <div class="overlay-body about-content">
-        <p>This app was made by <a href="https://www.linkedin.com/in/tylermcintyre" target="_blank" rel="noopener noreferrer" class="author-link">Tyler McIntyre</a> to help sort through the content at Money 2020. It is not an official app nor affiliated with Money 2020. If you are there feel free to say hi to him.</p>
-
-        <p>This app does not transmit data to any servers (except to fetch the list of events from M2020). It is run locally on your machine and data is stored on your machine only for privacy reasons!</p>
+        <p>Made by <a class="author-link" href="https://www.linkedin.com/in/tylermcintyre" target="_blank" rel="noopener noreferrer">Tyler McIntyre</a> to pick sessions faster at Money20/20 USA. It is not affiliated with Money20/20.</p>
+        <p><strong>Privacy.</strong> Your picks stay in this browser. The app only talks to the internet to fetch the schedule and, when you tap a calendar button, to build your calendar feed (it sends the IDs of your saved sessions to m2020.pages.dev — nothing else).</p>
+        <p class="muted">Session times are shown in Pacific Time (Las Vegas).</p>
+        <div class="about-keys">
+          <p class="about-keys-title">Keyboard shortcuts</p>
+          <dl>
+            <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Skip / save</dd>
+            <dt><kbd>Z</kbd></dt><dd>Undo</dd>
+            <dt><kbd>F</kbd></dt><dd>Filters</dd>
+            <dt><kbd>S</kbd></dt><dd>Saved sessions</dd>
+            <dt><kbd>Esc</kbd></dt><dd>Close a panel</dd>
+          </dl>
+        </div>
+        <div class="about-actions">
+          <button type="button" class="ui-btn ui-btn--secondary" id="about-refresh" data-app-action="refresh">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh"></use></svg>
+            Refresh schedule
+          </button>
+          <button type="button" class="ui-btn ui-btn--danger-text" id="about-reset" data-app-action="reset">Start over</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="overlay" id="export-overlay">
-    <div class="overlay-content">
+  <!-- More menu: action sheet (mobile) / popover (desktop) -->
+  <div class="overlay overlay--menu" id="more-overlay">
+    <div class="overlay-content sheet" role="dialog" aria-modal="true" aria-labelledby="more-title" tabindex="-1">
       <div class="overlay-header">
-        <h2>Export Calendar</h2>
-        <button class="close-btn" id="close-export">✕</button>
+        <h2 id="more-title">More</h2>
+        <button type="button" class="close-btn" data-app-action="close-more" aria-label="Close menu">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-x"></use></svg>
+        </button>
       </div>
-      <div class="overlay-body export-content">
-        <p class="export-intro">Download your selected events as a calendar file (.ics) to add them to your calendar app.</p>
-
-        <div class="export-instructions">
-          <h3>How to Import:</h3>
-          <ul>
-            <li>
-              <strong>Google Calendar:</strong>
-              <a href="https://support.google.com/calendar/answer/37118" target="_blank" rel="noopener noreferrer">Import ICS file guide</a>
-            </li>
-            <li>
-              <strong>Outlook:</strong>
-              <a href="https://support.microsoft.com/en-us/office/import-calendars-into-outlook-8e8364e1-400e-4c0f-a573-fe76b5a2d379" target="_blank" rel="noopener noreferrer">Import ICS file guide</a>
-            </li>
-          </ul>
-        </div>
-
-        <div class="export-cta">
-          <button class="export-download-btn" id="download-ics">Download ICS File</button>
-          <p class="export-count" id="export-count">0 events ready to export</p>
-        </div>
-      </div>
+      <ul class="menu-list">
+        <li>
+          <button type="button" class="menu-item" id="export" data-app-action="export">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-calendar"></use></svg>
+            Add to calendar
+          </button>
+        </li>
+        <li>
+          <button type="button" class="menu-item" id="about" data-app-action="about">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-info"></use></svg>
+            About
+          </button>
+        </li>
+        <li>
+          <button type="button" class="menu-item" id="refresh" data-app-action="refresh">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-refresh"></use></svg>
+            Refresh schedule
+          </button>
+        </li>
+        <li>
+          <button type="button" class="menu-item menu-item--danger" id="reset" data-app-action="reset">
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#i-rotate"></use></svg>
+            Start over
+          </button>
+        </li>
+      </ul>
     </div>
   </div>
 
-  <script src="events-data.js"></script>
+  <div class="overlay" id="filters-overlay">
+    <div class="overlay-content" id="filters-root" role="dialog" aria-modal="true" aria-labelledby="filters-title"></div>
+  </div>
+
+  <div class="overlay overlay--dialog" id="export-overlay">
+    <div class="overlay-content" id="export-root" role="dialog" aria-modal="true" aria-labelledby="export-title"></div>
+  </div>
+
+  <div id="sr-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div class="safe-probe" id="safe-probe" aria-hidden="true"></div>
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="core.js"></script>
+  <script src="venues.js"></script>
+  <script src="calendar.js"></script>
+  <script src="toast.js"></script>
+  <script src="filters.js"></script>
+  <script src="export-ui.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

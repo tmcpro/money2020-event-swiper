@@ -1,0 +1,393 @@
+/*
+ * toast.css - toasts (#toast-root) and the in-app confirm dialog rendered by toast.js.
+ * Colours, type, spacing, radii, shadows, layers and motion come only from the design tokens in
+ * styles.css :root. Optional hook: define --toast-offset on :root to move the toast stack (distance
+ * from the bottom edge, excluding the safe area); the default clears the bottom action bar.
+ */
+
+/* ---------------------------------------------------------------- */
+/* Toast stack                                                       */
+/* ---------------------------------------------------------------- */
+
+.toast-root {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--toast-offset, calc(var(--tap-target) * 2 + var(--space-3))) + env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-toast);
+  width: min(360px, calc(100vw - var(--space-4) * 2 - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  transform: translateX(-50%);
+  pointer-events: none;
+  font-family: var(--font-sans);
+}
+
+.toast-root--under-dialog {
+  z-index: calc(var(--z-dialog) - 1);
+}
+
+.toast-stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* Visually hidden live regions (announcements only). */
+.toast-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Each toast sits in a slot whose height collapses on exit so the rest of the stack glides. */
+.toast-slot {
+  padding-top: var(--space-2);
+  transition: height var(--duration-base) var(--ease-standard), padding var(--duration-base) var(--ease-standard);
+}
+
+.toast-slot.is-leaving {
+  overflow: hidden;
+  padding-top: 0;
+  pointer-events: none;
+}
+
+.toast {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-toast);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(var(--space-3)) scale(0.98);
+  transition:
+    opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-standard);
+}
+
+/* Type accent bar on the left edge. */
+.toast::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--toast-accent, var(--color-border));
+}
+
+.toast--success { --toast-accent: var(--color-success); }
+.toast--info { --toast-accent: var(--color-info); }
+.toast--error { --toast-accent: var(--color-danger); }
+.toast--warning { --toast-accent: var(--color-warning); }
+.toast--neutral { --toast-accent: var(--color-border); }
+
+.toast-slot.is-visible .toast {
+  opacity: 1;
+  transform: none;
+}
+
+.toast-slot.is-leaving .toast {
+  opacity: 0;
+  transform: translateY(var(--space-2)) scale(0.98);
+}
+
+.toast-slot.is-leaving .toast[data-exit='down'] { transform: translateY(var(--space-8)); }
+.toast-slot.is-leaving .toast[data-exit='left'] { transform: translateX(-100%); }
+.toast-slot.is-leaving .toast[data-exit='right'] { transform: translateX(100%); }
+
+.toast.is-dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+.toast.is-bumped {
+  animation: toast-bump var(--duration-base) var(--ease-standard);
+}
+
+@keyframes toast-bump {
+  0% { transform: none; }
+  40% { transform: scale(1.03); }
+  100% { transform: none; }
+}
+
+.toast__icon {
+  flex: none;
+  margin-right: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-7) - var(--space-1));
+  height: calc(var(--space-7) - var(--space-1));
+  border-radius: var(--radius-pill);
+  color: var(--toast-accent, var(--color-text-muted));
+  background: var(--color-surface-2);
+  background: color-mix(in srgb, var(--toast-accent, var(--color-border)) 18%, var(--color-surface));
+}
+
+.toast--neutral .toast__icon {
+  color: var(--color-text-muted);
+}
+
+.toast__icon svg {
+  display: block;
+}
+
+.toast__message {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2) 0;
+  overflow-wrap: anywhere;
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+}
+
+.toast__action,
+.toast__close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.toast__action {
+  padding: 0 var(--space-2);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.toast__close {
+  padding: 0;
+  color: var(--color-text-muted);
+}
+
+.toast__action:focus-visible,
+.toast__close:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.toast__action:active,
+.toast__close:active {
+  background: var(--color-surface-3);
+}
+
+@media (hover: hover) {
+  .toast__action:hover,
+  .toast__close:hover {
+    background: var(--color-surface-2);
+  }
+
+  .toast__close:hover {
+    color: var(--color-text);
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Confirm dialog                                                    */
+/* ---------------------------------------------------------------- */
+
+.confirm-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    calc(var(--space-4) + env(safe-area-inset-top, 0px))
+    calc(var(--space-4) + env(safe-area-inset-right, 0px))
+    calc(var(--space-4) + env(safe-area-inset-bottom, 0px))
+    calc(var(--space-4) + env(safe-area-inset-left, 0px));
+  background: var(--color-overlay);
+  font-family: var(--font-sans);
+  opacity: 0;
+  overscroll-behavior: contain;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.confirm-layer.is-visible {
+  opacity: 1;
+}
+
+.confirm-layer.is-leaving {
+  pointer-events: none;
+}
+
+.confirm-dialog {
+  width: min(400px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-card);
+  transform: translateY(var(--space-2)) scale(0.96);
+  transition: transform var(--duration-base) var(--ease-sheet);
+}
+
+.confirm-layer.is-visible .confirm-dialog {
+  transform: none;
+}
+
+.confirm-dialog__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-pill);
+  color: var(--color-danger);
+  background: var(--color-surface-2);
+  background: color-mix(in srgb, var(--color-danger) 18%, var(--color-surface));
+}
+
+.confirm-dialog__title {
+  margin: 0;
+  color: var(--color-text-strong, var(--color-text));
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+
+.confirm-dialog__message {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-base);
+  white-space: pre-line;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.confirm-btn {
+  min-width: calc(var(--tap-target) * 2);
+  min-height: 48px; /* same as the app's .ui-btn */
+  padding: 0 var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.confirm-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.confirm-btn:active {
+  transform: scale(0.97);
+}
+
+.confirm-btn--secondary {
+  border-color: var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.confirm-btn--primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.confirm-btn--danger {
+  background: var(--color-danger);
+  color: var(--color-accent-contrast);
+}
+
+@media (hover: hover) {
+  .confirm-btn--secondary:hover {
+    background: var(--color-surface-3);
+  }
+
+  .confirm-btn--primary:hover {
+    background: var(--color-accent-hover);
+  }
+
+  .confirm-btn--danger:hover {
+    background: color-mix(in srgb, var(--color-danger) 88%, var(--color-text-strong, var(--color-text)));
+  }
+}
+
+/* Narrow phones: full-width stacked buttons, the safe choice nearest the thumb. */
+@media (max-width: 359px) {
+  .confirm-dialog__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Reduced motion: fades only, no movement                           */
+/* ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .toast-slot.is-leaving .toast,
+  .toast-slot.is-leaving .toast[data-exit],
+  .confirm-dialog,
+  .confirm-btn:active {
+    transform: none;
+  }
+
+  .toast.is-bumped {
+    animation: none;
+  }
+}
+
+/* Windows high contrast / forced colours: keep edges visible. */
+@media (forced-colors: active) {
+  .toast,
+  .confirm-dialog {
+    border: 1px solid CanvasText;
+  }
+
+  .toast::before {
+    background: CanvasText;
+  }
+}

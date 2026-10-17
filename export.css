@@ -1,0 +1,512 @@
+/*
+ * export.css - "Add to calendar" dialog rendered by export-ui.js into #export-root (.export-sheet).
+ * Owner: calendar agent. Uses ONLY design tokens from styles.css :root.
+ * Mobile: bottom sheet (max 92dvh, safe-area aware). >= 900px: centred 520px dialog.
+ */
+
+/* ---------- container (overrides the shared .overlay-content sheet) ---------- */
+#export-overlay .export-sheet {
+  position: absolute;
+  top: auto;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  max-width: 640px;
+  max-height: 92vh;
+  max-height: 92dvh;
+  margin: 0 auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-sheet), 0 0 0 1px var(--color-border);
+  transform: translateY(100%);
+  transition: transform var(--duration-slow) var(--ease-sheet);
+  will-change: transform;
+  -webkit-font-smoothing: antialiased;
+}
+
+#export-overlay.visible .export-sheet {
+  transform: translateY(0);
+}
+
+@media (min-width: 900px) {
+  #export-overlay .export-sheet {
+    top: 50%;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    width: min(520px, calc(100vw - var(--space-7)));
+    max-height: min(86vh, 760px);
+    max-height: min(86dvh, 760px);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    opacity: 0;
+    transform: translate(-50%, -46%);
+    transition: transform var(--duration-base) var(--ease-standard),
+      opacity var(--duration-base) var(--ease-standard);
+  }
+
+  #export-overlay.visible .export-sheet {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+
+  #export-overlay .export-handle {
+    display: none;
+  }
+}
+
+/* ---------- header ---------- */
+.export-sheet .export-handle {
+  flex-shrink: 0;
+  width: 36px;
+  height: 4px;
+  margin: var(--space-2) auto 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+}
+
+.export-sheet .export-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.export-sheet .export-header__text {
+  flex: 1;
+  min-width: 0;
+  padding-top: var(--space-2);
+}
+
+.export-sheet .export-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text);
+}
+
+.export-sheet .export-title::before {
+  content: none;
+}
+
+.export-sheet .export-subtitle {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.export-sheet .export-close {
+  flex-shrink: 0;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+/* ---------- body ---------- */
+.export-sheet .export-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
+}
+
+.export-sheet .export-section + .export-section {
+  margin-top: var(--space-6);
+}
+
+.export-sheet .export-eyebrow {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-1);
+  font-size: var(--text-eyebrow);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* ---------- one-tap options ---------- */
+.export-sheet .export-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.export-sheet .export-option {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.export-sheet .export-option__link {
+  flex: 1;
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.export-sheet .export-option__link:active {
+  background: var(--color-surface-3);
+}
+
+.export-sheet .export-option__icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-accent);
+}
+
+/* The row that works natively on this device (set in export-ui.js: Google on computers, Apple on iOS,
+   Outlook work/school on other phones). */
+.export-sheet .export-option--primary {
+  border-color: var(--color-accent);
+}
+
+.export-sheet .export-option--primary .export-option__icon {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+/* Phones: the Google row is a copy button (Google adds calendars by URL only in a computer browser). */
+.export-sheet button.export-option__link {
+  width: 100%;
+  margin: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+}
+
+
+.export-sheet .export-option__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.export-sheet .export-option__label {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text);
+}
+
+.export-sheet .export-option__sub {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-tight);
+  color: var(--color-text-muted);
+}
+
+.export-sheet .export-option__go {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+
+.export-sheet .export-option__copy {
+  flex-shrink: 0;
+  width: var(--tap-target);
+  min-height: var(--tap-target);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-left: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.export-sheet .export-option__copy:active {
+  background: var(--color-surface-3);
+}
+
+.export-sheet .export-textbtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  margin-top: var(--space-1);
+  padding: 0 var(--space-1);
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.export-sheet .export-fineprint {
+  margin: 0;
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+/* ---------- good to know ---------- */
+.export-sheet .export-tips .export-bullets {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.export-sheet .export-bullets li + li {
+  margin-top: var(--space-2);
+}
+
+.export-sheet .export-bullets li::marker {
+  color: var(--color-text-muted);
+}
+
+.export-sheet strong {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+/* ---------- download fallback ---------- */
+.export-sheet .export-download {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
+}
+
+.export-sheet .export-download-btn {
+  width: 100%;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  box-shadow: none;
+  transform: none;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.export-sheet .export-download-btn:active {
+  background: var(--color-surface-3);
+}
+
+.export-sheet .export-help {
+  margin: var(--space-3) 0 0;
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.export-sheet .export-steps {
+  margin-top: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+.export-sheet .export-steps summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-1);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  list-style: none;
+}
+
+.export-sheet .export-steps summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Disclosure chevron (the native marker disappears with display:flex) */
+.export-sheet .export-steps summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.export-sheet .export-steps[open] summary::after {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+.export-sheet .export-steps dl {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+}
+
+.export-sheet .export-steps dt {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.export-sheet .export-steps dt:not(:first-child) {
+  margin-top: var(--space-3);
+}
+
+.export-sheet .export-steps dd {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+}
+
+.export-sheet .export-privacy {
+  margin: var(--space-6) 0 0;
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+/* ---------- hover (pointer devices only) ---------- */
+@media (hover: hover) {
+  .export-sheet .export-close:hover {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
+
+  .export-sheet .export-option__copy:hover {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+  }
+
+  .export-sheet .export-option__link:hover {
+    background: var(--color-surface-3);
+  }
+
+  .export-sheet .export-option__link:hover .export-option__go {
+    color: var(--color-accent);
+  }
+
+  .export-sheet .export-download-btn:hover {
+    background: var(--color-surface-3);
+  }
+
+  .export-sheet .export-textbtn:hover,
+  .export-sheet .export-steps summary:hover {
+    color: var(--color-accent-hover);
+  }
+}
+
+/* ---------- focus (global :focus-visible ring from styles.css; keep it inside rounded rows) ---------- */
+.export-sheet .export-option__link:focus-visible,
+.export-sheet .export-option__copy:focus-visible {
+  outline-offset: -3px;
+}
+
+/* ---------- reduced motion: fade only ---------- */
+@media (prefers-reduced-motion: reduce) {
+  #export-overlay .export-sheet,
+  #export-overlay.visible .export-sheet {
+    transform: none;
+    opacity: 0;
+    transition: opacity var(--duration-base) linear;
+  }
+
+  #export-overlay.visible .export-sheet {
+    opacity: 1;
+  }
+
+  @media (min-width: 900px) {
+    #export-overlay .export-sheet,
+    #export-overlay.visible .export-sheet {
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
+/* ---------- manual copy fallback (clipboard unavailable) ---------- */
+.export-sheet .export-manual {
+  margin-top: var(--space-2);
+}
+
+.export-sheet .export-manual[hidden] {
+  display: none;
+}
+
+.export-sheet .export-manual__label {
+  display: block;
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+.export-sheet .export-manual__input {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+}
