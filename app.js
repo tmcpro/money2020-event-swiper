@@ -6,8 +6,10 @@ const PROCESSED_IDS_KEY = 'event-swiper-processed-ids';
 const CURRENT_INDEX_KEY = 'event-swiper-current-index';
 const DATA_TIMESTAMP_KEY = 'event-swiper-data-timestamp';
 const EVENTS_CACHE_KEY = 'event-swiper-events-cache';
-const EVENTS_API = 'https://0jaku7mk0a.execute-api.eu-west-1.amazonaws.com/api/events/mu2025';
-const SPEAKERS_API = 'https://0jaku7mk0a.execute-api.eu-west-1.amazonaws.com/api/speakers/mu2025';
+// Money20/20 USA 2026 agenda. The upstream API (us.money2020.com/api/schedule) sends no CORS
+// headers, so the deployed site proxies it via functions/api/schedule.js. When that proxy is
+// unavailable (e.g. opening index.html directly), fall back to the bundled events-data.js snapshot.
+const SCHEDULE_API = '/api/schedule';
 const DATA_EXPIRY_DAYS = 4;
 
 let selectedEvents = loadStoredSelections();
@@ -190,6 +192,28 @@ async function fetchJson(url) {
   }
 }
 
+async function fetchSchedule() {
+  try {
+    return await fetchJson(SCHEDULE_API);
+  } catch (error) {
+    if (window.M2020_SCHEDULE_SNAPSHOT) {
+      console.warn('Live schedule unavailable, using bundled snapshot.', error);
+      return window.M2020_SCHEDULE_SNAPSHOT;
+    }
+    throw error;
+  }
+}
+
+// "2026-10-18" -> "Sunday 18 October" (the format formatDateTime expects)
+function formatDateLong(dateIso) {
+  const [y, m, d] = (dateIso || '').split('-').map((s) => parseInt(s, 10));
+  if (!y || !m || !d) return '';
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const weekday = dt.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+  const month = dt.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
+  return `${weekday} ${d} ${month}`;
+}
+
 function updateButtonStates() {
   const hasEvents = currentIndex < events.length;
   document.getElementById('btn-dislike').disabled = !hasEvents;
@@ -268,58 +292,41 @@ async function loadEvents(mode = 'initial') {
   updateButtonStates();
 
   try {
-    const [eventsData, speakersData] = await Promise.all([
-      fetchJson(EVENTS_API),
-      fetchJson(SPEAKERS_API)
-    ]);
+    const scheduleData = await fetchSchedule();
 
     // Save timestamp after successful fetch
     saveDataTimestamp();
 
-    if (!eventsData?.entities || !Array.isArray(eventsData.entities)) {
-      throw new Error('Invalid events payload received.');
-    }
-    if (!speakersData?.entities || !Array.isArray(speakersData.entities)) {
-      throw new Error('Invalid speakers payload received.');
+    if (!scheduleData?.events || !Array.isArray(scheduleData.events)) {
+      throw new Error('Invalid schedule payload received.');
     }
 
-    const speakerMap = {};
-    speakersData.entities.forEach((speaker) => {
-      speakerMap[speaker.appSpeakerId] = {
-        name: `${speaker.firstName || ''} ${speaker.lastName || ''}`.trim(),
-        jobTitle: speaker.jobTitle || '',
-        company: speaker.company || '',
-        bio: speaker.speakerBiography || '',
-        image: speaker.imageSrc || ''
-      };
-    });
-
-    const mapped = eventsData.entities.map((event) => {
+    const mapped = scheduleData.events.map((event) => {
       const normalizedDateIso = normalizeDateIso(event.dateIso);
       const normalizedStart = normalizeTime(event.startTime);
       const normalizedEnd = normalizeTime(event.endTime);
 
-      const speakers = (event.speakerData || []).map((sd) => {
-        const info = speakerMap[sd.appSpeakerId] || {};
-        return {
-          ...info,
-          type: sd.speakerType
-        };
-      }).filter((s) => s.name);
+      const speakers = (event.speakerData || []).map((sd) => ({
+        name: sd.speaker?.fullName || '',
+        jobTitle: sd.speaker?.jobTitle || '',
+        company: sd.speaker?.company || '',
+        image: sd.speaker?.imageSrc || '',
+        type: sd.speakerType?.speakerType || ''
+      })).filter((s) => s.name);
 
       return {
         eventId: event.eventId || `temp-${Date.now()}-${Math.random()}`,
         title: event.title || 'Untitled Event',
         description: event.description || '',
-        date: event.dateLong || 'Date TBA',
+        date: formatDateLong(normalizedDateIso) || 'Date TBA',
         dateIso: normalizedDateIso,
         rawDateIso: event.dateIso || '',
         startTime: normalizedStart,
         endTime: normalizedEnd,
-        venue: event.eventVenue || 'Venue TBA',
-        eventType: event.eventTypeName || '',
-        track: event.track || '',
-        topics: Array.isArray(event.eventTopics) ? event.eventTopics : [],
+        venue: event.eventLocation?.venue || 'Venue TBA',
+        eventType: event.eventType?.eventType || '',
+        track: '',
+        topics: (event.eventThemes || []).map((t) => t.eventTheme).filter(Boolean),
         speakers
       };
     });

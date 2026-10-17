@@ -26,7 +26,8 @@ You can open `index.html` directly in a browser
 
 ## How It Works
 
-- Events and speaker data are fetched from the official Money 2020 event endpoints 
+- Events (with speakers) come from the Money20/20 USA 2026 agenda API. That API has no CORS headers, so the deployed site proxies it through a Cloudflare Pages Function (`functions/api/schedule.js`) at `/api/schedule`.
+- When the proxy isn't available (e.g. opening `index.html` directly), the app falls back to the bundled snapshot in `events-data.js`. Refresh it with `./scripts/update-snapshot.sh`.
 - Selections persist in `localStorage`, so refreshing the page keeps your data and the data is only ever stored on your computer.
 - Export creates a timestamped JSON file in the browser using `Blob`
 - You then get an .ics file to import to your calendar with all the events. 
