@@ -1559,7 +1559,43 @@ svg.icon {
   padding-bottom: 0;
 }
 
+/* The session part of a row is one button that opens its details. It spans the row's full height (the
+   negative margin undoes the row padding) so the whole row is the tap target, except for Remove. */
+.saved-open {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: calc(-1 * var(--space-3)) 0;
+  padding: var(--space-3) var(--space-2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  text-align: left;
+}
+
+/* Rows with a day stripe have left padding to spare: pull the button into it so the times stay aligned
+   with the day banner while the inline padding keeps the focus ring off the text. */
+.saved-row[data-day] .saved-open {
+  margin-left: calc(-1 * var(--space-2));
+}
+
+/* .saved-row clips (for the remove animation), so draw the ring inside the button. */
+.saved-open:focus-visible {
+  outline-offset: -2px;
+}
+
+svg.icon.saved-chevron {
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+  transform: rotate(-90deg);
+}
+
 .saved-time {
+  display: block;
   flex-shrink: 0;
   align-self: flex-start;
   width: 72px;
@@ -1578,6 +1614,7 @@ svg.icon {
 }
 
 .saved-main {
+  display: block;
   flex: 1;
   min-width: 0;
 }
@@ -1594,6 +1631,7 @@ svg.icon {
 }
 
 .saved-where {
+  display: block;
   margin-top: 2px;
   font-size: var(--text-small);
   line-height: 1.4;
@@ -1608,6 +1646,71 @@ svg.icon {
 .saved-remove svg.icon {
   width: 20px;
   height: 20px;
+}
+
+/* ---- Saved session details (replaces the list inside the saved sheet) ---- */
+.saved-detail-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 calc(-1 * var(--space-5));
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+}
+
+.saved-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3) 0 var(--space-1);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--text-meta);
+  font-weight: var(--font-weight-semibold);
+}
+
+.saved-back svg.icon {
+  width: 20px;
+  height: 20px;
+  transform: rotate(90deg);
+}
+
+.saved-detail-head {
+  padding: var(--space-2) 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.saved-detail .card-eyebrow {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+  min-height: 34px;
+}
+
+.saved-detail-title {
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: var(--text-title);
+  line-height: 1.2;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.015em;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+/* Focus is moved to the title and the body by script (so screen readers read them); no ring for that. */
+.saved-detail-title:focus,
+.saved-detail-body:focus {
+  outline: none;
+}
+
+.saved-detail-body {
+  padding-top: var(--space-4);
+}
+
+.saved-detail-remove {
+  margin-top: var(--space-6);
 }
 
 .sheet-empty {
@@ -1785,6 +1888,15 @@ kbd {
 
   .saved-remove:hover {
     color: var(--color-danger);
+  }
+
+  .saved-open:hover .saved-title,
+  .saved-open:hover .saved-chevron {
+    color: var(--color-accent);
+  }
+
+  .saved-back:hover {
+    background: var(--color-surface-2);
   }
 
   .hint-keys,

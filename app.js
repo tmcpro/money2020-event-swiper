@@ -113,6 +113,9 @@ let gesture = null;             // active card drag
 let suppressClickUntil = 0;
 let lastAppFocus = null;        // last focused element inside #app (focus returns here when overlays close)
 let refocusAfterLoad = false;   // the focused "Try again" button vanished while loading
+let savedDetailId = null;       // eventId shown in the saved sheet's detail view (null = the list)
+let savedListScroll = 0;        // list scroll position to return to from the detail view
+let savedViewChangedAt = 0;     // the saved sheet swapped list <-> detail (the rest of a double click must not hit the new view)
 
 // --- Small helpers ---
 function idOf(session) {
@@ -779,10 +782,18 @@ function showDayPhrase() {
 }
 
 // --- Card rendering ---
-function topicsHtml(session) {
-  const themes = session.themes || session.topics || [];
+// Saved sessions can come straight from localStorage (written by an older version) before the schedule
+// loads, so list fields are never trusted to be arrays.
+function stringList(value) {
+  return Array.isArray(value) ? value.filter((v) => typeof v === 'string' && v) : [];
+}
+
+// heading: 'h3' on the card, 'h4' in the saved detail view (under its h3 title).
+function topicsHtml(session, heading) {
+  const h = heading || 'h3';
+  const themes = stringList(session.themes || session.topics);
   const themeSet = new Set(themes);
-  const tags = (session.tags || []).filter((t) => !themeSet.has(t));
+  const tags = stringList(session.tags).filter((t) => !themeSet.has(t));
   if (!themes.length && !tags.length) return '';
   const extra = tags.length - TOPIC_TAG_LIMIT;
   const chips = []
@@ -793,13 +804,14 @@ function topicsHtml(session) {
   }
   return `
     <section class="card-section">
-      <h3 class="eyebrow">Topics</h3>
+      <${h} class="eyebrow">Topics</${h}>
       <ul class="chips">${chips.join('')}</ul>
     </section>`;
 }
 
-function speakersHtml(session) {
-  const speakers = (session.speakers || []).filter((sp) => sp && sp.name);
+function speakersHtml(session, heading) {
+  const h = heading || 'h3';
+  const speakers = (Array.isArray(session.speakers) ? session.speakers : []).filter((sp) => sp && sp.name);
   if (!speakers.length) return '';
   const rows = speakers.map((sp) => {
     const role = [sp.jobTitle, sp.company].filter(Boolean).join(', ');
@@ -815,33 +827,26 @@ function speakersHtml(session) {
   }).join('');
   return `
     <section class="card-section">
-      <h3 class="eyebrow">${speakers.length === 1 ? 'Speaker' : 'Speakers'}</h3>
+      <${h} class="eyebrow">${speakers.length === 1 ? 'Speaker' : 'Speakers'}</${h}>
       <ul class="speakers">${rows}</ul>
     </section>`;
 }
 
-function cardHtml(session, isPeek) {
-  const v = venueInfo(session);
-  const format = formatLabel(session.eventType);
-  const duration = durationLabel(session);
+function descHtml(session) {
   const paragraphs = descriptionParagraphs(session.description);
-  const desc = paragraphs.length
+  return paragraphs.length
     ? `<div class="card-desc">${paragraphs.map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')}</div>`
     : '';
+}
+
+// When + where rows (card header and saved detail view).
+function metaHtml(session) {
+  const v = venueInfo(session);
+  const duration = durationLabel(session);
   const mapLink = v.mapUrl ? `
         <a class="map-link" href="${esc(v.mapUrl)}" target="_blank" rel="noopener noreferrer" draggable="false"
            aria-label="Floor map for ${esc(v.room)} (opens in a new tab)">${icon('map')}<span>Map</span></a>` : '';
   return `
-    <div class="card-day-bar" aria-hidden="true"></div>
-    <div class="card-stamp card-stamp--save" aria-hidden="true">Save</div>
-    <div class="card-stamp card-stamp--skip" aria-hidden="true">Skip</div>
-    <div class="card-scroll">
-    <div class="card-head">
-      <div class="card-eyebrow">
-        ${dayBadgeHtml(session.dateIso)}
-        ${format ? `<span class="chip chip--format">${esc(format)}</span>` : ''}
-      </div>
-      <h2 class="card-title"${isPeek ? '' : ` id="card-title-${esc(idOf(session))}"`}>${esc(session.title)}</h2>
       <div class="card-meta">
         <div class="card-row">
           ${icon('clock')}
@@ -854,10 +859,25 @@ function cardHtml(session, isPeek) {
             ${v.detail ? `<p class="where-detail">${esc(v.detail)}</p>` : ''}
           </div>${mapLink}
         </div>
+      </div>`;
+}
+
+function cardHtml(session, isPeek) {
+  const format = formatLabel(session.eventType);
+  return `
+    <div class="card-day-bar" aria-hidden="true"></div>
+    <div class="card-stamp card-stamp--save" aria-hidden="true">Save</div>
+    <div class="card-stamp card-stamp--skip" aria-hidden="true">Skip</div>
+    <div class="card-scroll">
+    <div class="card-head">
+      <div class="card-eyebrow">
+        ${dayBadgeHtml(session.dateIso)}
+        ${format ? `<span class="chip chip--format">${esc(format)}</span>` : ''}
       </div>
+      <h2 class="card-title"${isPeek ? '' : ` id="card-title-${esc(idOf(session))}"`}>${esc(session.title)}</h2>${metaHtml(session)}
     </div>
     <div class="card-body"${isPeek ? '' : ' tabindex="0" role="region" aria-label="Session details"'}>
-      ${desc}
+      ${descHtml(session)}
       ${topicsHtml(session)}
       ${speakersHtml(session)}
     </div>
@@ -1011,7 +1031,7 @@ function expandTags(button) {
     li.removeAttribute('data-extra-tag');
   });
   const item = button.closest('li');
-  const body = button.closest('.card-body');
+  const body = button.closest('.card-body, .saved-detail-body');
   const card = button.closest('.session-card');
   if (item) item.remove();
   if (body) body.focus({ preventScroll: true });
@@ -1503,16 +1523,75 @@ function savedRowHtml(session) {
   const where = [v.room, v.area].filter(Boolean).join(' · ');
   const start = clock(session.startTime, true) || 'Time TBA';
   const end = session.endTime && session.endTime !== session.startTime ? clock(session.endTime, true) : '';
+  // The row itself opens the session's details; Remove stays a separate button.
   return `
     <li class="saved-row" data-id="${esc(key)}"${dayAttr(session.dateIso)}>
-      <p class="saved-time">${esc(start)}${end ? `<span class="saved-time-end">– ${esc(end)}</span>` : ''}</p>
-      <div class="saved-main">
-        <p class="saved-title">${esc(session.title)}</p>
-        ${where ? `<p class="saved-where">${esc(where)}</p>` : ''}
-      </div>
+      <button type="button" class="saved-open" data-app-action="saved-detail" data-id="${esc(key)}">
+        <span class="saved-time">${esc(start)}${end ? `<span class="saved-time-end">– ${esc(end)}</span>` : ''}</span>
+        <span class="saved-main">
+          <span class="saved-title">${esc(session.title)}</span>
+          ${where ? `<span class="saved-where">${esc(where)}</span>` : ''}
+        </span>
+        ${icon('chevron-down', 'saved-chevron')}
+      </button>
       <button type="button" class="icon-btn saved-remove" data-app-action="remove-saved" data-id="${esc(key)}"
               aria-label="Remove ${esc(session.title)} from saved" title="Remove">${icon('trash')}</button>
     </li>`;
+}
+
+// --- Saved session details (read-only view: it never writes to localStorage) ---
+// Prefer the freshest copy of the session: the sheet can be opened before the schedule has loaded, when the
+// saved copy is whatever an earlier visit (or an earlier version of the app) stored.
+function savedSessionById(key) {
+  const saved = selectedEvents.find((s) => idOf(s) === key);
+  if (!saved) return null;
+  return allSessions.find((s) => idOf(s) === key) || saved;
+}
+
+function savedDetailHtml(session) {
+  const key = idOf(session);
+  const format = formatLabel(session.eventType);
+  return `
+    <div class="saved-detail"${dayAttr(session.dateIso)}>
+      <div class="saved-detail-bar">
+        <button type="button" class="saved-back" data-app-action="saved-back">${icon('chevron-down')}<span>All saved</span></button>
+      </div>
+      <div class="saved-detail-head">
+        <div class="card-eyebrow">
+          ${dayBadgeHtml(session.dateIso)}
+          ${format ? `<span class="chip chip--format">${esc(format)}</span>` : ''}
+        </div>
+        <h3 class="saved-detail-title" id="saved-detail-title" tabindex="-1">${esc(session.title)}</h3>${metaHtml(session)}
+      </div>
+      <div class="saved-detail-body" tabindex="-1">
+        ${descHtml(session)}
+        ${topicsHtml(session, 'h4')}
+        ${speakersHtml(session, 'h4')}
+      </div>
+      <button type="button" class="ui-btn ui-btn--danger-text ui-btn--block saved-detail-remove" data-app-action="remove-saved"
+              data-id="${esc(key)}">${icon('trash')}<span>Remove from saved</span></button>
+    </div>`;
+}
+
+function openSavedDetail(key) {
+  if (!key || !savedSessionById(key)) return;
+  savedListScroll = savedBody.scrollTop;
+  savedDetailId = key;
+  renderSaved();
+  savedViewChangedAt = performance.now();
+  savedBody.scrollTop = 0;
+  const title = $('saved-detail-title');
+  if (title) title.focus({ preventScroll: true });
+}
+
+function closeSavedDetail() {
+  const key = savedDetailId;
+  savedDetailId = null;
+  renderSaved();
+  savedViewChangedAt = performance.now();
+  savedBody.scrollTop = savedListScroll;
+  const row = key ? savedBody.querySelector(`.saved-open[data-id="${CSS.escape(key)}"]`) : null;
+  if (row) row.focus({ preventScroll: true });
 }
 
 function updateSavedChrome() {
@@ -1525,6 +1604,13 @@ function updateSavedChrome() {
 
 function renderSaved() {
   updateSavedChrome();
+  const detail = savedDetailId ? savedSessionById(savedDetailId) : null;
+  if (!detail) savedDetailId = null; // removed meanwhile: fall back to the list
+  savedBody.classList.toggle('is-detail', !!detail);
+  if (detail) {
+    savedBody.innerHTML = savedDetailHtml(detail);
+    return;
+  }
   const list = getSortedSelections();
   if (!list.length) {
     savedBody.innerHTML = `
@@ -1565,6 +1651,7 @@ function renderSaved() {
 
 function openSaved() {
   closeAppOverlays();
+  savedDetailId = null;
   renderSaved();
   showOverlay(savedOverlay);
   // After showOverlay: a scroller that is still display:none keeps its old offset, so the sheet would
@@ -1576,11 +1663,22 @@ function removeSaved(key, button) {
   const idx = selectedEvents.findIndex((s) => idOf(s) === key);
   if (idx === -1) return;
   const session = selectedEvents[idx];
+  const fromDetail = savedDetailId === key;
   const row = button ? button.closest('.saved-row') : null;
-  const rows = Array.from(savedBody.querySelectorAll('.saved-row'));
-  const rowIdx = rows.indexOf(row);
-  const neighbour = rows[rowIdx + 1] || rows[rowIdx - 1] || null;
-  const neighbourId = neighbour ? neighbour.dataset.id : null;
+  // Focus moves to the neighbouring session: its Remove button in the list or, coming from the detail
+  // view, its row (the sheet returns to the list where the attendee left it).
+  let neighbourId = null;
+  if (fromDetail) {
+    const list = getSortedSelections();
+    const i = list.findIndex((s) => idOf(s) === key);
+    const neighbour = list[i + 1] || list[i - 1] || null;
+    neighbourId = neighbour ? idOf(neighbour) : null;
+  } else {
+    const rows = Array.from(savedBody.querySelectorAll('.saved-row'));
+    const rowIdx = rows.indexOf(row);
+    const neighbour = rows[rowIdx + 1] || rows[rowIdx - 1] || null;
+    neighbourId = neighbour ? neighbour.dataset.id : null;
+  }
 
   selectedEvents.splice(idx, 1);
   saveSelections();
@@ -1595,10 +1693,19 @@ function removeSaved(key, button) {
     renderDeck(false);
   }
   updateSavedChrome();
+  if (fromDetail) savedDetailId = null;
 
   const rerender = () => {
+    // A row was opened during the collapse animation: its detail view already reflects the removal (the
+    // list redraws on the way back), so don't redraw it or move focus away from it.
+    if (!fromDetail && savedDetailId) return;
     renderSaved();
-    const next = neighbourId ? savedBody.querySelector(`.saved-remove[data-id="${CSS.escape(neighbourId)}"]`) : null;
+    if (fromDetail) {
+      savedBody.scrollTop = savedListScroll;
+      savedViewChangedAt = performance.now();
+    }
+    const selector = fromDetail ? '.saved-open' : '.saved-remove';
+    const next = neighbourId ? savedBody.querySelector(`${selector}[data-id="${CSS.escape(neighbourId)}"]`) : null;
     const fallback = savedBody.querySelector('.sheet-empty button') || $('close-overlay');
     const target = next || fallback;
     if (target && savedOverlay.contains(document.activeElement || null)) target.focus({ preventScroll: true });
@@ -1636,11 +1743,16 @@ function restoreSaved(session) {
     renderDeck(false);
   }
   if (isOverlayOpen(savedOverlay)) {
-    renderSaved();
-    const active = document.activeElement;
-    if (!active || active === document.body) {
-      const btn = savedBody.querySelector(`.saved-remove[data-id="${CSS.escape(key)}"]`);
-      if (btn) btn.focus({ preventScroll: true });
+    if (savedDetailId) {
+      // Detail view: only the count changes (the list redraws on the way back); keep focus where it is.
+      updateSavedChrome();
+    } else {
+      renderSaved();
+      const active = document.activeElement;
+      if (!active || active === document.body) {
+        const btn = savedBody.querySelector(`.saved-remove[data-id="${CSS.escape(key)}"]`);
+        if (btn) btn.focus({ preventScroll: true });
+      }
     }
   }
   announce(`${session.title} is saved again`);
@@ -1730,6 +1842,10 @@ document.addEventListener('click', (event) => {
   if (!target) return;
   if (target.getAttribute('aria-disabled') === 'true') return;
   const action = target.getAttribute('data-app-action');
+  // Opening a row swaps the sheet to its details (with "Remove from saved"), and removing from there swaps it
+  // back to the list: the second click of a double click/tap must not act on whatever now sits under it.
+  if ((action === 'remove-saved' || action === 'saved-detail' || action === 'saved-back') &&
+      (event.detail > 1 || performance.now() - savedViewChangedAt < 500)) return;
   switch (action) {
     case 'saved': openSaved(); break;
     case 'close-saved': hideOverlay(savedOverlay); break;
@@ -1748,6 +1864,8 @@ document.addEventListener('click', (event) => {
     case 'more-tags': expandTags(target); break;
     case 'scroll-card': scrollCard(target); break;
     case 'remove-saved': removeSaved(target.getAttribute('data-id'), target); break;
+    case 'saved-detail': openSavedDetail(target.getAttribute('data-id')); break;
+    case 'saved-back': closeSavedDetail(); break;
     default: break;
   }
 });
@@ -1767,7 +1885,11 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     if (document.querySelector('[role="alertdialog"]:not([hidden])')) return;
     const open = APP_OVERLAYS.find((o) => isOverlayOpen(o));
-    if (open) hideOverlay(open);
+    if (open === savedOverlay && savedDetailId) {
+      closeSavedDetail(); // Escape steps back from a session's details to the list first
+    } else if (open) {
+      hideOverlay(open);
+    }
     return;
   }
 
